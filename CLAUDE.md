@@ -132,7 +132,7 @@ bun run validate            # Step 3: Final check (must pass)
   2. On protected-branch integration (strict mode), if increase is intentional and accepted, run `bun run maintainability:baseline`.
   3. Commit both the code change and `docs/metrics/maintainability-baseline.json`, and state reason in PR description.
 
-## Critical Constraints (NEVER VIOLATE)
+## Critical Output Constraints
 
 1. **NO EMOJIS in CLI output** - Terminal output uses ASCII only: [OK], [!], [X], [i]
    - **Scope:** CCS CLI terminal output (`src/` code that prints to stdout/stderr)
@@ -160,6 +160,8 @@ bun run validate            # Step 3: Final check (must pass)
 | `ccs env --help` | `src/commands/env-command.ts` → `showHelp()` |
 | `ccs persist --help` | `src/commands/persist-command.ts` → `showHelp()` |
 | `ccs setup --help` | `src/commands/setup-command.ts` → `showHelp()` |
+| `ccs websearch --help` | `src/commands/websearch-command.ts` → `showHelp()` |
+| `ccs proxy --help` | `src/commands/proxy-command.ts` → `showHelp()` |
 
 **Note:** `lib/ccs` and `lib/ccs.ps1` are bootstrap wrappers only—they delegate to Node.js and contain no help text.
 
@@ -224,7 +226,42 @@ lib/           → Native shell scripts (bash, PowerShell)
 ui/src/        → React components, hooks, pages
 ui/src/components/ui/ → shadcn/ui components
 dist/ui/       → Built UI bundle (served by Express)
+config/        → Base configuration templates for providers
+tests/         → Unit tests, npm tests, native shell tests
+docs/          → Technical documentation
+scripts/       → Build and utility scripts
 ```
+
+## High-Level Architecture
+
+CCS is a CLI wrapper and dashboard system for switching between multiple Claude accounts and alternative AI providers.
+
+### Core Modules
+
+- **`src/ccs.ts`** - Main entry point, command routing, profile detection
+- **`src/commands/`** - CLI command handlers (15+ commands)
+- **`src/auth/`** - Authentication, profile detection, account switching
+- **`src/config/`** - Unified YAML config loading, migration
+- **`src/cliproxy/`** - OAuth proxy integration (modularized)
+- **`src/copilot/`** - GitHub Copilot integration
+- **`src/glmt/`** - GLM/GLMT thinking mode proxy
+- **`src/delegation/`** - Headless task execution
+- **`src/web-server/`** - Express server with 15+ routes, WebSocket support
+- **`ui/src/`** - React dashboard with real-time WebSocket updates
+
+### Profile Detection Priority
+
+1. **CLIProxy hardcoded**: gemini, codex, agy → OAuth-based, zero config
+2. **CLIProxy variants**: `config.cliproxy` section → user-defined providers
+3. **Settings-based**: `config.profiles` section → GLM, GLMT, Kimi
+4. **Account-based**: `profiles.json` → isolated instances via `CLAUDE_CONFIG_DIR`
+
+### Dashboard Architecture
+
+- **Express server** serves static UI and REST APIs
+- **WebSocket** enables real-time updates across dashboard components
+- **React Context** manages theme, WebSocket connection, and privacy state
+- **shadcn/ui** provides consistent component library
 
 ## Key Technical Details
 
@@ -272,8 +309,14 @@ Windows fallback: Copies if symlinks unavailable
 ### TypeScript (src/*.ts)
 - Node.js 14+, Bun 1.0+, TypeScript 5.3, strict mode
 - `child_process.spawn`, handle SIGINT/SIGTERM
+- Barrel exports (`index.ts`) in each module
+- Service layer pattern in API and web-server modules
 
-### Terminal Output
+### React (ui/src/*.tsx)
+- Vite dev server, HMR with fast refresh
+- WebSocket for real-time dashboard updates
+- React Context for global state (theme, WebSocket, privacy)
+- shadcn/ui for consistent components
 - ASCII only: [OK], [!], [X], [i] (NO emojis in CLI output)
 - TTY detect before colors, respect NO_COLOR
 - Box borders for errors: ╔═╗║╚╝
@@ -370,10 +413,17 @@ bun run dev               # Build + start config server (http://localhost:3000)
 bun run dev:symlink       # Symlink global 'ccs' → dev dist/ccs.js (fast iteration)
 bun run dev:unlink        # Restore original global ccs
 ./scripts/dev-install.sh  # Build, pack, install globally (full install)
-rm -rf ~/.ccs             # Clean environment
+rm -rf ~/.ccs             # Clean environment (CAUTION: deletes all config)
 ```
 
 **IMPORTANT:** Use `bun run dev` at CCS root for always up-to-date code. Do NOT use `ccs config` during development as it uses the globally installed version.
+
+### UI Development
+```bash
+cd ui
+bun run dev               # Vite dev server with HMR
+bun run build             # Build for production
+```
 
 ## Pre-Commit Checklist
 
