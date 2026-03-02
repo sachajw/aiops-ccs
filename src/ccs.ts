@@ -107,7 +107,8 @@ function detectProfile(args: string[]): DetectedProfile {
 async function execClaudeWithProxy(
   claudeCli: string,
   profileName: string,
-  args: string[]
+  args: string[],
+  claudeConfigDir?: string
 ): Promise<void> {
   // 1. Read settings to get API key
   const settingsPath = getSettingsPath(profileName);
@@ -208,6 +209,7 @@ async function execClaudeWithProxy(
     ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
     ANTHROPIC_AUTH_TOKEN: apiKey,
     ANTHROPIC_MODEL: configuredModel,
+    ...(claudeConfigDir ? { CLAUDE_CONFIG_DIR: claudeConfigDir } : {}),
   };
 
   const isWindows = process.platform === 'win32';
@@ -611,6 +613,8 @@ async function main(): Promise<void> {
   const ProfileRegistry = ProfileRegistryModule.default;
   const AccountContextModule = await import('./auth/account-context');
   const { resolveAccountContextPolicy, isAccountContextMetadata } = AccountContextModule;
+  const ProfileContinuityModule = await import('./auth/profile-continuity-inheritance');
+  const { resolveProfileContinuityInheritance } = ProfileContinuityModule;
 
   const detector = new ProfileDetector();
 
@@ -948,7 +952,23 @@ async function main(): Promise<void> {
         console.error(fail('Copilot configuration not found'));
         process.exit(1);
       }
-      const exitCode = await executeCopilotProfile(copilotConfig, remainingArgs);
+      const continuityInheritance = await resolveProfileContinuityInheritance({
+        profileName: profileInfo.name,
+        profileType: profileInfo.type,
+        target: resolvedTarget,
+      });
+      if (continuityInheritance.sourceAccount && process.env.CCS_DEBUG) {
+        console.error(
+          info(
+            `Continuity inheritance active: profile "${profileInfo.name}" -> account "${continuityInheritance.sourceAccount}"`
+          )
+        );
+      }
+      const exitCode = await executeCopilotProfile(
+        copilotConfig,
+        remainingArgs,
+        continuityInheritance.claudeConfigDir
+      );
       process.exit(exitCode);
     } else if (profileInfo.type === 'settings') {
       // Settings-based profiles (glm, glmt) are third-party providers
@@ -962,6 +982,23 @@ async function main(): Promise<void> {
 
       // Display WebSearch status (single line, equilibrium UX)
       displayWebSearchStatus();
+
+      const continuityInheritance =
+        resolvedTarget === 'claude'
+          ? await resolveProfileContinuityInheritance({
+              profileName: profileInfo.name,
+              profileType: profileInfo.type,
+              target: resolvedTarget,
+            })
+          : {};
+      if (continuityInheritance.sourceAccount && process.env.CCS_DEBUG) {
+        console.error(
+          info(
+            `Continuity inheritance active: profile "${profileInfo.name}" -> account "${continuityInheritance.sourceAccount}"`
+          )
+        );
+      }
+      const inheritedClaudeConfigDir = continuityInheritance.claudeConfigDir;
 
       // Pre-flight validation for GLM/GLMT/MiniMax profiles
       if (profileInfo.name === 'glm' || profileInfo.name === 'glmt') {
@@ -1026,7 +1063,12 @@ async function main(): Promise<void> {
           process.exit(1);
         }
         // GLMT FLOW: Settings-based with embedded proxy for thinking support
-        await execClaudeWithProxy(claudeCli, profileInfo.name, remainingArgs);
+        await execClaudeWithProxy(
+          claudeCli,
+          profileInfo.name,
+          remainingArgs,
+          inheritedClaudeConfigDir
+        );
       } else {
         // EXISTING FLOW: Settings-based profile (glm)
         // Use --settings flag (backward compatible)
@@ -1055,6 +1097,7 @@ async function main(): Promise<void> {
         const envVars: NodeJS.ProcessEnv = {
           ...globalEnv,
           ...settingsEnv, // Explicitly inject all settings env vars
+          ...(inheritedClaudeConfigDir ? { CLAUDE_CONFIG_DIR: inheritedClaudeConfigDir } : {}),
           ...webSearchEnv,
           ...imageAnalysisEnv,
           CCS_PROFILE_TYPE: 'settings', // Signal to WebSearch hook this is a third-party provider
@@ -1127,6 +1170,24 @@ async function main(): Promise<void> {
         CCS_WEBSEARCH_SKIP: '1',
         CCS_IMAGE_ANALYSIS_SKIP: '1',
       };
+
+      if (resolvedTarget === 'claude') {
+        const defaultContinuityInheritance = await resolveProfileContinuityInheritance({
+          profileName: profileInfo.name,
+          profileType: profileInfo.type,
+          target: resolvedTarget,
+        });
+        if (defaultContinuityInheritance.sourceAccount && process.env.CCS_DEBUG) {
+          console.error(
+            info(
+              `Continuity inheritance active: profile "${profileInfo.name}" -> account "${defaultContinuityInheritance.sourceAccount}"`
+            )
+          );
+        }
+        if (defaultContinuityInheritance.claudeConfigDir) {
+          envVars.CLAUDE_CONFIG_DIR = defaultContinuityInheritance.claudeConfigDir;
+        }
+      }
 
       // Dispatch through target adapter for non-claude targets
       if (resolvedTarget !== 'claude') {

@@ -50,6 +50,25 @@ Deeper continuity links these directories per context group:
 
 `.anthropic` and account credentials remain isolated.
 
+## Cross-Profile Inheritance (API / CLIProxy / Copilot)
+
+You can explicitly map non-account profiles (including `default`) to reuse continuity artifacts from an account profile:
+
+```yaml
+continuity:
+  inherit_from_account:
+    glm: pro
+    gemini: pro
+    copilot: pro
+```
+
+Behavior:
+
+- Applies only when running Claude target (`ccs <profile>` or `--target claude`)
+- Does not change provider credentials or API routing
+- Reuses `CLAUDE_CONFIG_DIR` from mapped account profile after normal account context policy resolution
+- Invalid/missing mapped accounts are skipped safely
+
 ## User Workflows
 
 ### New account with shared context

@@ -39,7 +39,10 @@ export async function getCopilotStatus(config: CopilotConfig): Promise<CopilotSt
  * Generate environment variables for Claude Code to use copilot-api.
  * Uses model mapping for opus/sonnet/haiku tiers if configured.
  */
-export function generateCopilotEnv(config: CopilotConfig): Record<string, string> {
+export function generateCopilotEnv(
+  config: CopilotConfig,
+  claudeConfigDir?: string
+): Record<string, string> {
   // Use mapped models if configured, otherwise fall back to default model
   const opusModel = config.opus_model || config.model;
   const sonnetModel = config.sonnet_model || config.model;
@@ -59,6 +62,7 @@ export function generateCopilotEnv(config: CopilotConfig): Record<string, string
     // Disable non-essential traffic to avoid rate limiting
     DISABLE_NON_ESSENTIAL_MODEL_CALLS: '1',
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+    ...(claudeConfigDir ? { CLAUDE_CONFIG_DIR: claudeConfigDir } : {}),
   };
 }
 
@@ -71,7 +75,8 @@ export function generateCopilotEnv(config: CopilotConfig): Record<string, string
  */
 export async function executeCopilotProfile(
   config: CopilotConfig,
-  claudeArgs: string[]
+  claudeArgs: string[],
+  claudeConfigDir?: string
 ): Promise<number> {
   // Ensure copilot-api is installed (auto-install if missing, auto-update if outdated)
   try {
@@ -130,7 +135,7 @@ export async function executeCopilotProfile(
   }
 
   // Generate environment for Claude
-  const copilotEnv = generateCopilotEnv(config);
+  const copilotEnv = generateCopilotEnv(config, claudeConfigDir);
 
   // Get global env vars (DISABLE_TELEMETRY, etc.) for third-party profiles
   const globalEnvConfig = getGlobalEnvConfig();

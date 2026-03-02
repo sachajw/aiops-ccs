@@ -331,6 +331,20 @@ accounts:
 
 Shared context with `standard` depth links project workspace data. `deeper` depth links additional continuity artifacts. Credentials remain isolated per account.
 
+#### Cross-Profile Continuity Inheritance (Claude Target)
+
+You can map non-account profiles (API, CLIProxy, Copilot, or `default`) to reuse continuity artifacts from an account profile:
+
+```yaml
+continuity:
+  inherit_from_account:
+    glm: pro
+    gemini: pro
+    copilot: pro
+```
+
+With this config, `ccs glm`, `ccs gemini`, and `ccs copilot` run with `pro`'s `CLAUDE_CONFIG_DIR` continuity context while keeping each profile's own provider credentials/settings.
+
 Alternative path for lower manual switching:
 
 - Use CLIProxy Claude pool (`ccs cliproxy auth claude`) and manage pool behavior in `ccs config` -> `CLIProxy Plus`.

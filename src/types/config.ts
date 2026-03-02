@@ -51,6 +51,8 @@ export interface Config {
   profile_targets?: Record<string, TargetType>;
   /** User-defined CLIProxy profile variants (optional) */
   cliproxy?: CLIProxyVariantsConfig;
+  /** Legacy continuity inheritance mapping (profile -> source account) */
+  continuity_inherit_from_account?: Record<string, string>;
 }
 
 /**

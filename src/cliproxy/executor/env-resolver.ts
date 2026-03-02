@@ -59,6 +59,8 @@ export interface ProxyChainConfig {
   };
   /** Composite variant: which tier is the default */
   compositeDefaultTier?: 'opus' | 'sonnet' | 'haiku';
+  /** Optional inherited continuity directory from mapped account profile */
+  claudeConfigDir?: string;
 }
 
 const CODEX_EFFORT_SUFFIX_REGEX = /^(.*)-(xhigh|high|medium)$/i;
@@ -113,6 +115,7 @@ export function buildClaudeEnvironment(config: ProxyChainConfig): Record<string,
     isComposite,
     compositeTiers,
     compositeDefaultTier,
+    claudeConfigDir,
   } = config;
 
   // Build base env vars - check remote mode first
@@ -264,6 +267,7 @@ export function buildClaudeEnvironment(config: ProxyChainConfig): Record<string,
   const mergedEnv = {
     ...baseEnv,
     ...effectiveEnvVarsFiltered,
+    ...(claudeConfigDir ? { CLAUDE_CONFIG_DIR: claudeConfigDir } : {}),
     ...webSearchEnv,
     ...imageAnalysisEnv,
     CCS_PROFILE_TYPE: 'cliproxy', // Signal to WebSearch hook this is a third-party provider

@@ -92,4 +92,24 @@ describe('buildClaudeEnvironment codex fallback normalization', () => {
     expect(env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('gpt-5-mini-medium');
     expect(env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:9444/api/provider/codex');
   });
+
+  it('propagates inherited CLAUDE_CONFIG_DIR when provided', () => {
+    const settingsPath = createCodexSettingsFile({
+      defaultModel: 'gpt-5.3-codex',
+      opusModel: 'gpt-5.3-codex',
+      sonnetModel: 'gpt-5.3-codex',
+      haikuModel: 'gpt-5-mini',
+    });
+
+    const env = buildClaudeEnvironment({
+      provider: 'codex',
+      useRemoteProxy: false,
+      localPort: 8317,
+      customSettingsPath: settingsPath,
+      claudeConfigDir: '/tmp/.ccs/instances/pro',
+      verbose: false,
+    });
+
+    expect(env.CLAUDE_CONFIG_DIR).toBe('/tmp/.ccs/instances/pro');
+  });
 });

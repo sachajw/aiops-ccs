@@ -155,6 +155,10 @@ Run ${color('ccs config', 'command')} for web dashboard`.trim();
         'Create account profile (supports shared groups + --deeper-continuity)',
       ],
       ['ccs config', 'Dashboard: Accounts table can edit context mode/group/continuity depth'],
+      [
+        '~/.ccs/config.yaml',
+        'Optional: continuity.inherit_from_account maps API/CLIProxy/copilot/default profiles to an account context',
+      ],
       ['ccs auth list', 'List all account profiles'],
       ['ccs auth default <name>', 'Set default profile'],
       ['ccs auth reset-default', 'Restore original CCS default'],

@@ -197,6 +197,8 @@ export interface ExecutorConfig {
   compositeDefaultTier?: 'opus' | 'sonnet' | 'haiku';
   /** Original profile/variant name (e.g., "my-mix" for composite variants) */
   profileName?: string;
+  /** Optional inherited continuity directory from mapped account profile */
+  claudeConfigDir?: string;
 }
 
 /**

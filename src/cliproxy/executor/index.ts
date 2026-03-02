@@ -53,6 +53,7 @@ import { loadOrCreateUnifiedConfig, getThinkingConfig } from '../../config/unifi
 import { installImageAnalyzerHook } from '../../utils/hooks';
 import { HttpsTunnelProxy } from '../https-tunnel-proxy';
 import { isKiroAuthMethod, KiroAuthMethod, normalizeKiroAuthMethod } from '../auth/auth-types';
+import { resolveProfileContinuityInheritance } from '../../auth/profile-continuity-inheritance';
 
 // Import modular components
 import { waitForProxyReadyWithSpinner, spawnProxy } from './lifecycle-manager';
@@ -795,6 +796,21 @@ export async function execClaudeWithCLIProxy(
   // 9. Setup tool sanitization proxy
   let toolSanitizationProxy: ToolSanitizationProxy | null = null;
   let toolSanitizationPort: number | null = null;
+  let inheritedClaudeConfigDir = cfg.claudeConfigDir;
+
+  if (!inheritedClaudeConfigDir && cfg.profileName) {
+    const continuityInheritance = await resolveProfileContinuityInheritance({
+      profileName: cfg.profileName,
+      profileType: 'cliproxy',
+      target: 'claude',
+    });
+    inheritedClaudeConfigDir = continuityInheritance.claudeConfigDir;
+    if (continuityInheritance.sourceAccount && process.env.CCS_DEBUG) {
+      log(
+        `Continuity inheritance active: profile "${cfg.profileName}" -> account "${continuityInheritance.sourceAccount}"`
+      );
+    }
+  }
 
   // Build initial env vars to get ANTHROPIC_BASE_URL
   const initialEnvVars = buildClaudeEnvironment({
@@ -818,6 +834,7 @@ export async function execClaudeWithCLIProxy(
     isComposite: cfg.isComposite,
     compositeTiers: cfg.compositeTiers,
     compositeDefaultTier: cfg.compositeDefaultTier,
+    claudeConfigDir: inheritedClaudeConfigDir,
   });
 
   if (initialEnvVars.ANTHROPIC_BASE_URL) {
@@ -913,6 +930,7 @@ export async function execClaudeWithCLIProxy(
     isComposite: cfg.isComposite,
     compositeTiers: cfg.compositeTiers,
     compositeDefaultTier: cfg.compositeDefaultTier,
+    claudeConfigDir: inheritedClaudeConfigDir,
   });
 
   if (cfg.isComposite && cfg.compositeTiers && cfg.compositeDefaultTier) {

@@ -419,6 +419,15 @@ export interface GlobalEnvConfig {
 }
 
 /**
+ * Cross-profile continuity inheritance configuration.
+ * Maps execution profile names to source account profiles for CLAUDE_CONFIG_DIR reuse.
+ */
+export interface ContinuityConfig {
+  /** Profile name -> source account profile name */
+  inherit_from_account?: Record<string, string>;
+}
+
+/**
  * Default global env vars for third-party profiles.
  * These disable Claude Code telemetry/reporting since we're using proxy.
  */
@@ -717,6 +726,8 @@ export interface UnifiedConfig {
   websearch?: WebSearchConfig;
   /** Global environment variables for all non-Claude subscription profiles */
   global_env?: GlobalEnvConfig;
+  /** Cross-profile continuity inheritance mapping */
+  continuity?: ContinuityConfig;
   /** Copilot API configuration (GitHub Copilot proxy) */
   copilot?: CopilotConfig;
   /** Cursor IDE configuration (Cursor proxy daemon) */

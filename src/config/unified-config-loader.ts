@@ -29,6 +29,7 @@ import {
   DashboardAuthConfig,
   ImageAnalysisConfig,
   CursorConfig,
+  ContinuityConfig,
 } from './unified-config-types';
 import { validateCompositeTiers } from '../cliproxy/composite-validator';
 import { isUnifiedConfigEnabled } from './feature-flags';
@@ -231,11 +232,57 @@ function validateCompositeVariants(config: UnifiedConfig): void {
 }
 
 /**
+ * Normalize continuity inheritance mapping payload.
+ * Keeps only non-empty string keys and values.
+ */
+function normalizeContinuityInheritanceMap(value: unknown): Record<string, string> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const normalized: Record<string, string> = {};
+  for (const [profileName, accountName] of Object.entries(value as Record<string, unknown>)) {
+    const normalizedProfile = profileName.trim();
+    const normalizedAccount = typeof accountName === 'string' ? accountName.trim() : '';
+
+    if (!normalizedProfile || !normalizedAccount) {
+      continue;
+    }
+
+    normalized[normalizedProfile] = normalizedAccount;
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
+/**
+ * Normalize continuity section.
+ * Supports legacy root key: continuity_inherit_from_account.
+ */
+function normalizeContinuityConfig(partial: Partial<UnifiedConfig>): ContinuityConfig | undefined {
+  const continuityMap = normalizeContinuityInheritanceMap(partial.continuity?.inherit_from_account);
+  if (continuityMap) {
+    return { inherit_from_account: continuityMap };
+  }
+
+  const legacyMap = normalizeContinuityInheritanceMap(
+    (partial as Partial<UnifiedConfig> & { continuity_inherit_from_account?: unknown })
+      .continuity_inherit_from_account
+  );
+  if (legacyMap) {
+    return { inherit_from_account: legacyMap };
+  }
+
+  return undefined;
+}
+
+/**
  * Merge partial config with defaults.
  * Preserves existing data while filling in missing sections.
  */
 function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
   const defaults = createEmptyUnifiedConfig();
+  const continuity = normalizeContinuityConfig(partial);
   return {
     version: partial.version ?? defaults.version,
     setup_completed: partial.setup_completed,
@@ -328,6 +375,7 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
       enabled: partial.global_env?.enabled ?? true,
       env: partial.global_env?.env ?? { ...DEFAULT_GLOBAL_ENV },
     },
+    continuity,
     // CLIProxy server config - remote/local CLIProxyAPI settings
     cliproxy_server: {
       remote: {
@@ -650,6 +698,22 @@ function generateYamlWithComments(config: UnifiedConfig): string {
     lines.push('');
   }
 
+  // Continuity inheritance section
+  if (config.continuity?.inherit_from_account) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Continuity Inheritance: Reuse account continuity artifacts across profiles');
+    lines.push('# Map execution profile names to source account profiles (CLAUDE_CONFIG_DIR).');
+    lines.push('# Applies to Claude target only; credentials remain profile-specific.');
+    lines.push('# Example: continuity.inherit_from_account.glm: pro');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml
+        .dump({ continuity: config.continuity }, { indent: 2, lineWidth: -1, quotingType: '"' })
+        .trim()
+    );
+    lines.push('');
+  }
+
   // Thinking section (extended thinking/reasoning configuration)
   if (config.thinking) {
     lines.push('# ----------------------------------------------------------------------------');
@@ -956,6 +1020,15 @@ export function getGlobalEnvConfig(): GlobalEnvConfig {
     enabled: config.global_env?.enabled ?? true,
     env: config.global_env?.env ?? { ...DEFAULT_GLOBAL_ENV },
   };
+}
+
+/**
+ * Get continuity inheritance mapping.
+ * Returns empty mapping when not configured.
+ */
+export function getContinuityInheritanceMap(): Record<string, string> {
+  const config = loadOrCreateUnifiedConfig();
+  return config.continuity?.inherit_from_account ?? {};
 }
 
 /**
