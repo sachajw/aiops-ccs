@@ -26,8 +26,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Prefer PAT when available (workflow-trigger compatibility), but never hard-fail when PAT is missing/expired.
-          token: ${{ secrets.PAT_TOKEN != '' && secrets.PAT_TOKEN || github.token }}
+          # Always use the built-in workflow token; PAT rotation/breakage must not block dev releases.
+          token: ${{ github.token }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

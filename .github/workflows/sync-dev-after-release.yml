@@ -20,8 +20,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Prefer PAT when available, but fall back to built-in token to avoid hard dependency on PAT rotation.
-          token: ${{ secrets.PAT_TOKEN != '' && secrets.PAT_TOKEN || github.token }}
+          # Always use built-in workflow token so PAT rotation never breaks sync jobs.
+          token: ${{ github.token }}
 
       - name: Configure Git
         run: |
