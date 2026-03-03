@@ -741,6 +741,14 @@ oauth-model-alias:
         !afterCacheConfig.includes('alias: gemini-3.11-pro-preview-customtools'),
         'Should not include compatibility alias for cache-derived entry'
       );
+      assert(
+        afterCacheConfig.includes('alias: gemini-3-pro-preview'),
+        'Should keep baseline Gemini preview alias generation'
+      );
+      assert(
+        afterCacheConfig.includes('alias: gemini-3-pro-preview-customtools'),
+        'Should keep baseline compatibility alias generation'
+      );
     });
 
     it('preserves user-added aliases with fork during regeneration', () => {
