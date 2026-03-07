@@ -42,6 +42,7 @@ import {
 import { PRIVACY_BLUR_CLASS } from '@/contexts/privacy-context';
 import { useAccountQuota, useCliproxyStats } from '@/hooks/use-cliproxy-stats';
 import { QuotaTooltipContent } from '@/components/shared/quota-tooltip-content';
+import { useTranslation } from 'react-i18next';
 import type { AccountItemProps } from './types';
 
 /**
@@ -106,6 +107,7 @@ export function AccountItem({
   selected,
   onSelectChange,
 }: AccountItemProps) {
+  const { t } = useTranslation();
   const normalizedProvider = account.provider.toLowerCase();
   const isCodexProvider = normalizedProvider === 'codex';
   const isClaudeProvider = normalizedProvider === 'claude' || normalizedProvider === 'anthropic';
@@ -436,7 +438,7 @@ export function AccountItem({
                 className="text-[10px] h-5 px-2 gap-1 border-muted-foreground/50 text-muted-foreground"
               >
                 <HelpCircle className="w-3 h-3" />
-                No limits
+                {t('accountCard.quotaUnavailable')}
               </Badge>
             </div>
           ) : quota?.needsReauth ? (
