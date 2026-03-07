@@ -102,4 +102,24 @@ describe('installDashboardCliproxyVersion', () => {
     expect(calls.installCliproxyVersion).toBe(1);
     expect(calls.ensureCliproxyService).toBe(1);
   });
+
+  it('uses a fallback restart error when the start result omits one', async () => {
+    const { deps } = createDeps({
+      remoteRunning: true,
+      startResult: {
+        started: false,
+        alreadyRunning: false,
+        port: 8317,
+      },
+    });
+
+    const result = await installDashboardCliproxyVersion('6.7.1', 'plus', deps);
+
+    expect(result).toEqual<DashboardCliproxyInstallResult>({
+      success: false,
+      restarted: false,
+      error: 'Installed CLIProxy Plus v6.7.1, but restart failed',
+      message: 'Installed CLIProxy Plus v6.7.1, but failed to restart it',
+    });
+  });
 });

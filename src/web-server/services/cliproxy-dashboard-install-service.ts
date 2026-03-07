@@ -51,6 +51,8 @@ export async function installDashboardCliproxyVersion(
   const backendLabel = backend === 'plus' ? 'CLIProxy Plus' : 'CLIProxy';
   const shouldRestoreService = await wasProxyRunning(deps);
 
+  // The installer owns the stop-and-replace lifecycle: it stops a running proxy
+  // and waits for the port to free before swapping the binary.
   await deps.installCliproxyVersion(version, true, backend);
 
   if (!shouldRestoreService) {
