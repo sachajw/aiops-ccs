@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, userEvent, waitFor } from '@tests/setup/test-utils';
 import i18n from '@/lib/i18n';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
+import { HistorySyncLearningMap } from '@/components/account/history-sync-learning-map';
 import { TabNavigation } from '@/pages/settings/components/tab-navigation';
 import {
   getInitialLocale,
@@ -124,6 +125,44 @@ describe('Dashboard i18n', () => {
     expect(screen.getByText('网页')).toBeInTheDocument();
     expect(screen.getByText('环境')).toBeInTheDocument();
     expect(screen.getByText('认证')).toBeInTheDocument();
+  });
+
+  it('shows Japanese labels on translated settings tabs', async () => {
+    await i18n.changeLanguage('ja');
+
+    render(<TabNavigation activeTab="websearch" onTabChange={() => {}} />);
+
+    expect(screen.getByText('Web検索')).toBeInTheDocument();
+    expect(screen.getByText('環境変数')).toBeInTheDocument();
+    expect(screen.getByText('思考')).toBeInTheDocument();
+  });
+
+  it('renders Japanese history sync guidance without fallback English copy', async () => {
+    await i18n.changeLanguage('ja');
+
+    render(
+      <HistorySyncLearningMap
+        isolatedCount={1}
+        sharedStandardCount={2}
+        deeperSharedCount={3}
+        sharedGroups={['default']}
+        legacyTargetCount={2}
+        cliproxyCount={1}
+      />
+    );
+
+    expect(screen.getByText('履歴同期の仕組み')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 件の CLIProxy Claude Pool アカウントは、CLIProxy ページで管理します。')
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: '詳細を表示: グループ、切り替え、レガシーポリシー' })
+    );
+
+    expect(
+      screen.getByText('2 件のレガシーアカウントで明示的な確認がまだ必要です。')
+    ).toBeInTheDocument();
   });
 
   it.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))(
