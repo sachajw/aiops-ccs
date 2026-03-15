@@ -7,10 +7,7 @@
 
 import { initUI, header, dim, color, subheader, fail, warn } from '../utils/ui';
 import { getCcsDir } from '../utils/config-manager';
-import {
-  CLAUDE_EXTENSION_HOSTS,
-  type ClaudeExtensionHost,
-} from '../shared/claude-extension-hosts';
+import { CLAUDE_EXTENSION_HOSTS, type ClaudeExtensionHost } from '../shared/claude-extension-hosts';
 import {
   renderClaudeExtensionSettingsJson,
   resolveClaudeExtensionSetup,
@@ -157,8 +154,12 @@ function showHelp(): void {
   );
   console.log('');
   console.log(subheader('Notes:'));
-  console.log(`  ${dim('- Use ccs persist <profile> for shared ~/.claude/settings.json setup when possible.')}`);
-  console.log(`  ${dim('- claude-extension output prints JSON only; replace the full environmentVariables setting.')}`);
+  console.log(
+    `  ${dim('- Use ccs persist <profile> for shared ~/.claude/settings.json setup when possible.')}`
+  );
+  console.log(
+    `  ${dim('- claude-extension output prints JSON only; replace the full environmentVariables setting.')}`
+  );
   console.log('');
 }
 
@@ -178,7 +179,9 @@ export async function handleEnvCommand(args: string[]): Promise<void> {
   const flagsWithValues = ['format', 'shell', 'ide'];
   const profile = findProfile(args, flagsWithValues);
   if (!profile) {
-    console.error(fail('Usage: ccs env <profile> [--format openai|anthropic|raw|claude-extension]'));
+    console.error(
+      fail('Usage: ccs env <profile> [--format openai|anthropic|raw|claude-extension]')
+    );
     process.exit(1);
   }
 

@@ -720,7 +720,9 @@ async function showHelp(): Promise<void> {
   console.log(subheader('Notes'));
   console.log('  [i] CLIProxy profiles require the proxy to be running.');
   console.log('  [i] Copilot profiles require copilot-api daemon.');
-  console.log('  [i] Account/default flows remove stale ANTHROPIC_* overrides before applying new setup.');
+  console.log(
+    '  [i] Account/default flows remove stale ANTHROPIC_* overrides before applying new setup.'
+  );
   console.log(
     '  [i] For IDE-local settings.json snippets, use: ccs env <profile> --format claude-extension'
   );
@@ -832,7 +834,9 @@ export async function handlePersistCommand(args: string[]): Promise<void> {
   // Warning about modification
   console.log(warn(`This will modify ${getClaudeSettingsDisplayPath()}`));
   console.log(dim('    Existing hooks and other settings will be preserved.'));
-  console.log(dim('    Existing managed profile env keys will be replaced to avoid stale routing.'));
+  console.log(
+    dim('    Existing managed profile env keys will be replaced to avoid stale routing.')
+  );
   console.log('');
   // Check if settings.json exists for backup
   const settingsPath = getClaudeSettingsPath();

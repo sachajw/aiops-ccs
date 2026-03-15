@@ -3,7 +3,11 @@ import ProfileDetector from '../auth/profile-detector';
 import { resolveProfileContinuityInheritance } from '../auth/profile-continuity-inheritance';
 import { resolveAccountContextPolicy, isAccountContextMetadata } from '../auth/account-context';
 import type { ProfileDetectionResult } from '../auth/profile-detector';
-import { getEffectiveEnvVars, getRemoteEnvVars, getCompositeEnvVars } from '../cliproxy/config/env-builder';
+import {
+  getEffectiveEnvVars,
+  getRemoteEnvVars,
+  getCompositeEnvVars,
+} from '../cliproxy/config/env-builder';
 import { CLIPROXY_DEFAULT_PORT } from '../cliproxy/config/port-manager';
 import { getProxyTarget } from '../cliproxy/proxy-target-resolver';
 import { generateCopilotEnv } from '../copilot/copilot-executor';
@@ -70,14 +74,19 @@ function describeProfile(profileName: string, result: ProfileDetectionResult): s
       ? 'Use Claude Code defaults with no CCS-specific transport override.'
       : `Use the current default profile resolution for "${result.name}".`;
   }
-  if (result.type === 'cliproxy') return 'OAuth or CLIProxy-backed profile for Anthropic-compatible routing.';
+  if (result.type === 'cliproxy')
+    return 'OAuth or CLIProxy-backed profile for Anthropic-compatible routing.';
   if (result.type === 'settings') return 'API profile backed by a CCS settings file.';
-  if (result.type === 'account') return 'Claude account instance isolated through CLAUDE_CONFIG_DIR.';
+  if (result.type === 'account')
+    return 'Claude account instance isolated through CLAUDE_CONFIG_DIR.';
   if (result.type === 'copilot') return 'GitHub Copilot profile routed through copilot-api.';
   return 'Native Claude profile resolution.';
 }
 
-function createProfileOption(profileName: string, result: ProfileDetectionResult): ClaudeExtensionProfileOption {
+function createProfileOption(
+  profileName: string,
+  result: ProfileDetectionResult
+): ClaudeExtensionProfileOption {
   return {
     name: profileName,
     profileType: result.type,
@@ -89,7 +98,13 @@ function createProfileOption(profileName: string, result: ProfileDetectionResult
 export function listClaudeExtensionProfiles(): ClaudeExtensionProfileOption[] {
   const detector = new ProfileDetector();
   const all = detector.getAllProfiles();
-  const orderedNames = ['default', ...all.accounts, ...all.settings, ...all.cliproxy, ...all.cliproxyVariants];
+  const orderedNames = [
+    'default',
+    ...all.accounts,
+    ...all.settings,
+    ...all.cliproxy,
+    ...all.cliproxyVariants,
+  ];
   const deduped = [...new Set(orderedNames)];
   try {
     detector.detectProfileType('copilot');
@@ -106,7 +121,9 @@ export function listClaudeExtensionProfiles(): ClaudeExtensionProfileOption[] {
 async function resolveExtensionEnv(
   requestedProfile: string,
   result: ProfileDetectionResult
-): Promise<Pick<ClaudeExtensionSetup, 'extensionEnv' | 'warnings' | 'notes' | 'disableLoginPrompt'>> {
+): Promise<
+  Pick<ClaudeExtensionSetup, 'extensionEnv' | 'warnings' | 'notes' | 'disableLoginPrompt'>
+> {
   const warnings: string[] = [];
   const notes: string[] = [];
   const requestedIsDefault = requestedProfile === 'default';
@@ -144,7 +161,9 @@ async function resolveExtensionEnv(
       };
     }
 
-    notes.push('Default profile clears CCS-managed transport overrides and uses native Claude defaults.');
+    notes.push(
+      'Default profile clears CCS-managed transport overrides and uses native Claude defaults.'
+    );
     return { extensionEnv: {}, warnings, notes, disableLoginPrompt: false };
   }
 
@@ -155,30 +174,60 @@ async function resolveExtensionEnv(
   });
   const env =
     result.type === 'settings'
-      ? result.env ?? (result.settingsPath ? loadSettingsFromFile(expandPath(result.settingsPath)) : {})
+      ? (result.env ??
+        (result.settingsPath ? loadSettingsFromFile(expandPath(result.settingsPath)) : {}))
       : result.type === 'copilot'
-        ? generateCopilotEnv(result.copilotConfig!, continuity.claudeConfigDir)
+        ? (() => {
+            if (!result.copilotConfig) {
+              throw new Error(`Profile "${requestedProfile}" is missing copilot configuration.`);
+            }
+            return generateCopilotEnv(result.copilotConfig, continuity.claudeConfigDir);
+          })()
         : (() => {
+            if (!result.provider) {
+              throw new Error(
+                `Profile "${requestedProfile}" is missing CLIProxy provider metadata.`
+              );
+            }
             const proxyTarget = getProxyTarget();
             const port = result.port || CLIPROXY_DEFAULT_PORT;
             if (proxyTarget.isRemote) {
-              warnings.push(`CLIProxy is configured for remote routing via ${proxyTarget.protocol}://${proxyTarget.host}:${proxyTarget.port}.`);
+              warnings.push(
+                `CLIProxy is configured for remote routing via ${proxyTarget.protocol}://${proxyTarget.host}:${proxyTarget.port}.`
+              );
               return result.isComposite && result.compositeTiers && result.compositeDefaultTier
-                ? getCompositeEnvVars(result.compositeTiers, result.compositeDefaultTier, port, result.settingsPath, proxyTarget)
-                : getRemoteEnvVars(result.provider!, proxyTarget, result.settingsPath);
+                ? getCompositeEnvVars(
+                    result.compositeTiers,
+                    result.compositeDefaultTier,
+                    port,
+                    result.settingsPath,
+                    proxyTarget
+                  )
+                : getRemoteEnvVars(result.provider, proxyTarget, result.settingsPath);
             }
-            warnings.push('CLIProxy-backed profiles require the local or remote proxy endpoint to be reachable.');
+            warnings.push(
+              'CLIProxy-backed profiles require the local or remote proxy endpoint to be reachable.'
+            );
             return result.isComposite && result.compositeTiers && result.compositeDefaultTier
-              ? getCompositeEnvVars(result.compositeTiers, result.compositeDefaultTier, port, result.settingsPath)
-              : getEffectiveEnvVars(result.provider!, port, result.settingsPath);
+              ? getCompositeEnvVars(
+                  result.compositeTiers,
+                  result.compositeDefaultTier,
+                  port,
+                  result.settingsPath
+                )
+              : getEffectiveEnvVars(result.provider, port, result.settingsPath);
           })();
 
   if (!requestedIsDefault && continuity.claudeConfigDir && !env.CLAUDE_CONFIG_DIR) {
     env.CLAUDE_CONFIG_DIR = continuity.claudeConfigDir;
-    notes.push(`Continuity inheritance adds CLAUDE_CONFIG_DIR from account "${continuity.sourceAccount}".`);
+    notes.push(
+      `Continuity inheritance adds CLAUDE_CONFIG_DIR from account "${continuity.sourceAccount}".`
+    );
   }
   if (result.type === 'copilot') {
-    warnings.push('copilot-api must stay reachable for this profile to work inside the IDE extension.');
+    warnings.push(
+      'copilot-api must stay reachable for this profile to work inside the IDE extension.'
+    );
   }
   if (Object.keys(env).length === 0) {
     throw new Error(`Profile "${requestedProfile}" has no extension environment to export.`);
@@ -187,7 +236,9 @@ async function resolveExtensionEnv(
   return { extensionEnv: sortEnvRecord(env), warnings, notes, disableLoginPrompt: true };
 }
 
-export async function resolveClaudeExtensionSetup(requestedProfile: string): Promise<ClaudeExtensionSetup> {
+export async function resolveClaudeExtensionSetup(
+  requestedProfile: string
+): Promise<ClaudeExtensionSetup> {
   const detector = new ProfileDetector();
   const result = detector.detectProfileType(requestedProfile);
   const resolved = await resolveExtensionEnv(requestedProfile, result);
@@ -212,7 +263,10 @@ export function renderClaudeExtensionSettingsJson(
 ): string {
   const definition = getClaudeExtensionHostDefinition(host);
   const payload: Record<string, unknown> = {
-    [definition.settingsKey]: Object.entries(setup.extensionEnv).map(([name, value]) => ({ name, value })),
+    [definition.settingsKey]: Object.entries(setup.extensionEnv).map(([name, value]) => ({
+      name,
+      value,
+    })),
   };
   if (definition.disableLoginPromptKey && setup.disableLoginPrompt) {
     payload[definition.disableLoginPromptKey] = true;
@@ -224,7 +278,9 @@ export function renderSharedClaudeSettingsJson(setup: ClaudeExtensionSetup): str
   return JSON.stringify({ env: setup.extensionEnv }, null, 2);
 }
 
-export function getClaudeExtensionHostMetadata(host: ClaudeExtensionHost): ClaudeExtensionHostDefinition {
+export function getClaudeExtensionHostMetadata(
+  host: ClaudeExtensionHost
+): ClaudeExtensionHostDefinition {
   return getClaudeExtensionHostDefinition(host);
 }
 

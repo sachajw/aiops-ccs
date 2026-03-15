@@ -18,7 +18,9 @@ const VALID_HOSTS = new Set(CLAUDE_EXTENSION_HOSTS.map((host) => host.id));
 function getHostFromRequest(req: Request): ClaudeExtensionHost {
   const rawHost = String(req.query.host || 'vscode');
   if (!VALID_HOSTS.has(rawHost as ClaudeExtensionHost)) {
-    throw new Error(`Invalid host "${rawHost}". Use: ${CLAUDE_EXTENSION_HOSTS.map((host) => host.id).join(', ')}`);
+    throw new Error(
+      `Invalid host "${rawHost}". Use: ${CLAUDE_EXTENSION_HOSTS.map((host) => host.id).join(', ')}`
+    );
   }
   return rawHost as ClaudeExtensionHost;
 }

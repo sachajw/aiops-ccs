@@ -38,5 +38,7 @@ export const CLAUDE_EXTENSION_HOSTS: ClaudeExtensionHostDefinition[] = [
 export function getClaudeExtensionHostDefinition(
   host: ClaudeExtensionHost = 'vscode'
 ): ClaudeExtensionHostDefinition {
-  return CLAUDE_EXTENSION_HOSTS.find((candidate) => candidate.id === host) ?? CLAUDE_EXTENSION_HOSTS[0];
+  return (
+    CLAUDE_EXTENSION_HOSTS.find((candidate) => candidate.id === host) ?? CLAUDE_EXTENSION_HOSTS[0]
+  );
 }
