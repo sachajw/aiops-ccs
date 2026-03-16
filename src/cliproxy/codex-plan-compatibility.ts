@@ -66,7 +66,9 @@ export async function reconcileCodexModelForActivePlan(options: {
   }
 
   if (quota.planType === 'free') {
-    updateSettingsModel(settingsPath, fallbackModel, 'codex');
+    updateSettingsModel(settingsPath, fallbackModel, 'codex', {
+      rewriteHaikuModel: (haikuModel) => getFreePlanFallbackCodexModel(haikuModel) ?? haikuModel,
+    });
     console.error(
       info(
         `Codex free plan detected. Switched unsupported model "${normalizeCodexModelId(currentModel)}" ` +

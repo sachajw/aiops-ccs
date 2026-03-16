@@ -7,7 +7,10 @@ afterEach(() => {
   mock.restore();
 });
 
-function createCodexSettingsFixture(): { tmpDir: string; settingsPath: string } {
+function createCodexSettingsFixture(haikuModel: string = 'gpt-5-codex-mini'): {
+  tmpDir: string;
+  settingsPath: string;
+} {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-codex-plan-compat-'));
   const settingsPath = path.join(tmpDir, 'codex.settings.json');
 
@@ -21,7 +24,7 @@ function createCodexSettingsFixture(): { tmpDir: string; settingsPath: string } 
           ANTHROPIC_MODEL: 'gpt-5.3-codex',
           ANTHROPIC_DEFAULT_OPUS_MODEL: 'gpt-5.3-codex',
           ANTHROPIC_DEFAULT_SONNET_MODEL: 'gpt-5.3-codex',
-          ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gpt-5-codex-mini',
+          ANTHROPIC_DEFAULT_HAIKU_MODEL: haikuModel,
         },
       },
       null,
@@ -39,7 +42,7 @@ async function importCompatibilityModule(cacheTag: string) {
 
 describe('codex plan compatibility reconcile', () => {
   it('repairs stale paid-only Codex settings for free-plan accounts before launch', async () => {
-    const { tmpDir, settingsPath } = createCodexSettingsFixture();
+    const { tmpDir, settingsPath } = createCodexSettingsFixture('gpt-5.3-codex-spark');
 
     mock.module('../../../src/cliproxy/account-manager', () => ({
       getDefaultAccount: () => ({ id: 'free@example.com' }),
@@ -223,6 +226,56 @@ describe('codex plan compatibility reconcile', () => {
         env: Record<string, string>;
       };
       expect(settings.env.ANTHROPIC_MODEL).toBe('gpt-5.3-codex');
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Could not verify Codex plan for model "gpt-5.3-codex". If startup fails with model_not_supported, switch to "gpt-5-codex" via "ccs codex --config".'
+      );
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('warns and keeps settings unchanged when quota succeeds without a plan type', async () => {
+    const { tmpDir, settingsPath } = createCodexSettingsFixture();
+
+    mock.module('../../../src/cliproxy/account-manager', () => ({
+      getDefaultAccount: () => ({ id: 'missing-plan@example.com' }),
+    }));
+    mock.module('../../../src/cliproxy/quota-fetcher-codex', () => ({
+      fetchCodexQuota: async () => ({
+        success: true,
+        windows: [],
+        coreUsage: { fiveHour: null, weekly: null },
+        planType: null,
+        lastUpdated: Date.now(),
+        accountId: 'missing-plan@example.com',
+      }),
+    }));
+    mock.module('../../../src/cliproxy/quota-response-cache', () => ({
+      getCachedQuota: () => null,
+      setCachedQuota: () => {},
+    }));
+    mock.module('../../../src/utils/ui', () => ({
+      info: (message: string) => message,
+      warn: (message: string) => message,
+    }));
+
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      const { reconcileCodexModelForActivePlan } =
+        await importCompatibilityModule('missing-plan-type');
+
+      await reconcileCodexModelForActivePlan({
+        settingsPath,
+        currentModel: 'gpt-5.3-codex',
+        verbose: false,
+      });
+
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')) as {
+        env: Record<string, string>;
+      };
+      expect(settings.env.ANTHROPIC_MODEL).toBe('gpt-5.3-codex');
+      expect(settings.env.ANTHROPIC_DEFAULT_HAIKU_MODEL).toBe('gpt-5-codex-mini');
       expect(errorSpy).toHaveBeenCalledWith(
         'Could not verify Codex plan for model "gpt-5.3-codex". If startup fails with model_not_supported, switch to "gpt-5-codex" via "ccs codex --config".'
       );
