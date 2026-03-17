@@ -1,5 +1,11 @@
+import { existsSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'bun:test';
-import { getPresetById, isValidPresetId } from '../../../src/api/services/provider-presets';
+import {
+  PROVIDER_PRESETS,
+  getPresetById,
+  isValidPresetId,
+} from '../../../src/api/services/provider-presets';
 
 describe('provider-presets', () => {
   it('resolves Alibaba Coding Plan preset id', () => {
@@ -53,5 +59,14 @@ describe('provider-presets', () => {
   it('uses non-reserved default profile name for qwen API preset', () => {
     const preset = getPresetById('qwen');
     expect(preset?.defaultProfileName).toBe('qwen-api');
+  });
+
+  it('only references provider preset icons that exist in ui/public', () => {
+    for (const preset of PROVIDER_PRESETS) {
+      if (!preset.icon) continue;
+
+      const iconPath = resolve(import.meta.dir, '../../../ui/public', preset.icon.replace(/^\/+/, ''));
+      expect(existsSync(iconPath)).toBe(true);
+    }
   });
 });

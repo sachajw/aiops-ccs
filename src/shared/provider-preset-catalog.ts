@@ -21,6 +21,7 @@ export const PROVIDER_PRESET_IDS = [
   'deepseek',
   'qwen',
   'ollama-cloud',
+  'novita',
 ] as const;
 
 export type ProviderPresetId = (typeof PROVIDER_PRESET_IDS)[number];
@@ -253,6 +254,20 @@ const RAW_PROVIDER_PRESET_DEFINITIONS: readonly ProviderPresetDefinition[] = [
     requiresApiKey: true,
     badge: 'Cloud',
     icon: '/icons/ollama.svg',
+  },
+  {
+    id: 'novita',
+    name: 'Novita AI',
+    description: 'Anthropic-compatible API for Claude Code and CCS profiles',
+    baseUrl: 'https://api.novita.ai/anthropic',
+    defaultProfileName: 'novita',
+    defaultModel: 'deepseek/deepseek-v3.2',
+    apiKeyPlaceholder: 'YOUR_NOVITA_API_KEY',
+    apiKeyHint: 'Get your API key at novita.ai',
+    category: 'alternative',
+    requiresApiKey: true,
+    badge: 'Anthropic-compatible',
+    icon: '/icons/novita.svg',
   },
 ];
 

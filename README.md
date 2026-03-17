@@ -110,6 +110,7 @@ The dashboard provides visual management for all account types:
 | **Azure Foundry** | API Key | `ccs foundry` | Claude via Microsoft Azure |
 | **Minimax** | API Key | `ccs mm` | M2 series, 1M context |
 | **DeepSeek** | API Key | `ccs deepseek` | V3.2 and R1 reasoning |
+| **Novita AI** | API Key | `ccs api create --preset novita` | Anthropic-compatible Novita endpoint for Claude Code |
 | **Qwen (OAuth)** | OAuth | `ccs qwen` | Qwen Code via CLIProxy |
 | **Qwen API** | API Key | `ccs api create --preset qwen` | DashScope Anthropic-compatible API |
 | **Alibaba Coding Plan** | API Key | `ccs api create --preset alibaba-coding-plan` | Model Studio Coding Plan endpoint |
