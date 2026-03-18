@@ -234,7 +234,9 @@ class ProfileContextSyncLock {
 
         const until = Date.now() + retryDelayMs;
         while (Date.now() < until) {
-          // Busy wait only during rare lock contention.
+          // Sync callers need a synchronous retry path here.
+          // This lock only guards short local filesystem normalization work, so
+          // contention should be brief and limited to profile/bootstrap edges.
         }
       }
     }
