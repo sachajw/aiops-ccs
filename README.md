@@ -194,16 +194,25 @@ ccs api export glm --out ./glm.ccs-profile.json  # Export for cross-device trans
 ccs api import ./glm.ccs-profile.json        # Import exported profile bundle
 ```
 
-### Droid Alias (`argv[0]` pattern)
+### Runtime Aliases (built-in bins / `argv[0]` pattern)
 
-By default, invoking CCS as `ccsd` auto-selects the Droid target:
+Built-in Droid runtime aliases are installed with the package:
 
 ```bash
-ln -s "$(command -v ccs)" /usr/local/bin/ccsd
-ccsd glm
+ccs-droid glm   # explicit alias
+ccsd glm        # legacy shortcut
 ```
 
-Need additional alias names? Set `CCS_DROID_ALIASES` as a comma-separated list (for example: `CCS_DROID_ALIASES=ccs-droid,mydroid`).
+Need additional alias names? First create the matching symlink or another launcher that
+preserves the invoked basename, then map that name with `CCS_TARGET_ALIASES` (preferred) or legacy
+`CCS_DROID_ALIASES`:
+
+```bash
+ln -s "$(command -v ccs)" /usr/local/bin/mydroid
+CCS_TARGET_ALIASES='droid=mydroid'
+# Legacy fallback still supported:
+CCS_DROID_ALIASES='mydroid'
+```
 
 For Factory BYOK compatibility, CCS also stores a per-profile Droid provider hint
 (`CCS_DROID_PROVIDER`) using one of:
@@ -217,9 +226,9 @@ which Droid treats as queued prompt text.
 CCS supports structural Droid command passthrough after profile selection:
 
 ```bash
-ccsd codex exec --skip-permissions-unsafe "fix failing tests"
-ccsd codex --skip-permissions-unsafe "fix failing tests"   # auto-routed to: droid exec ...
-ccsd codex -m custom:gpt-5.3-codex "fix failing tests"     # short exec flags auto-routed too
+ccs-droid codex exec --skip-permissions-unsafe "fix failing tests"
+ccs-droid codex --skip-permissions-unsafe "fix failing tests"   # auto-routed to: droid exec ...
+ccs-droid codex -m custom:gpt-5.3-codex "fix failing tests"     # short exec flags auto-routed too
 ```
 
 If you pass exec-only flags without a prompt (for example `--skip-permissions-unsafe`),
@@ -245,10 +254,10 @@ ccs cliproxy create mycodex --provider codex --target droid
 Built-in CLIProxy providers also work with Droid alias/target override:
 
 ```bash
-ccsd codex
-ccsd agy
+ccs-droid codex
+ccs-droid agy
 ccs codex --target droid
-ccsd codex exec --auto high "triage this bug report"
+ccs-droid codex exec --auto high "triage this bug report"
 ```
 
 Dashboard parity:
