@@ -7,11 +7,13 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { getCapturedFetchRequests, mockFetch, restoreFetch } from '../../mocks';
 
 describe('Gemini CLI Quota Fetcher', () => {
   let tempHome: string;
+  let originalCcsHome: string | undefined;
+  let originalCcsDir: string | undefined;
   let originalGeminiClientId: string | undefined;
   let originalGeminiClientSecret: string | undefined;
   let moduleVersion = 0;
@@ -30,31 +32,16 @@ describe('Gemini CLI Quota Fetcher', () => {
 
   beforeEach(async () => {
     moduleVersion += 1;
-    mock.restore();
-
     tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-gemini-refresh-'));
+    originalCcsHome = process.env.CCS_HOME;
+    originalCcsDir = process.env.CCS_DIR;
     originalGeminiClientId = process.env.CCS_GEMINI_OAUTH_CLIENT_ID;
     originalGeminiClientSecret = process.env.CCS_GEMINI_OAUTH_CLIENT_SECRET;
+    process.env.CCS_HOME = tempHome;
 
     delete process.env.CCS_GEMINI_OAUTH_CLIENT_ID;
     delete process.env.CCS_GEMINI_OAUTH_CLIENT_SECRET;
-
-    const authDir = path.join(tempHome, '.ccs', 'cliproxy', 'auth');
-    const actualConfigGenerator = await import(
-      `../../../src/cliproxy/config-generator?gemini-config-generator-actual=${moduleVersion}`
-    );
-    const actualAccountManager = await import(
-      `../../../src/cliproxy/account-manager?gemini-account-manager-actual=${moduleVersion}`
-    );
-    mock.module('../../../src/cliproxy/config-generator', () => ({
-      ...actualConfigGenerator,
-      getProviderAuthDir: () => authDir,
-    }));
-    mock.module('../../../src/cliproxy/account-manager', () => ({
-      ...actualAccountManager,
-      getDefaultAccount: () => null,
-      getProviderAccounts: () => [],
-    }));
+    delete process.env.CCS_DIR;
 
     const configGenerator = await import(
       `../../../src/cliproxy/config-generator?gemini-config-generator=${moduleVersion}`
@@ -69,9 +56,20 @@ describe('Gemini CLI Quota Fetcher', () => {
   });
 
   afterEach(() => {
-    mock.restore();
     restoreFetch();
     fs.rmSync(tempHome, { recursive: true, force: true });
+
+    if (originalCcsHome === undefined) {
+      delete process.env.CCS_HOME;
+    } else {
+      process.env.CCS_HOME = originalCcsHome;
+    }
+
+    if (originalCcsDir === undefined) {
+      delete process.env.CCS_DIR;
+    } else {
+      process.env.CCS_DIR = originalCcsDir;
+    }
 
     if (originalGeminiClientId === undefined) {
       delete process.env.CCS_GEMINI_OAUTH_CLIENT_ID;

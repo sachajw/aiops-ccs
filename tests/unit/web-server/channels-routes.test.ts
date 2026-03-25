@@ -1,10 +1,9 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, mock } from 'bun:test';
 import express from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { Server } from 'http';
-import channelsRoutes from '../../../src/web-server/routes/channels-routes';
 import { getOfficialChannelsConfig } from '../../../src/config/unified-config-loader';
 
 async function putJson(baseUrl: string, routePath: string, body: unknown): Promise<Response> {
@@ -16,13 +15,47 @@ async function putJson(baseUrl: string, routePath: string, body: unknown): Promi
 }
 
 describe('web-server channels-routes', () => {
+  let channelsRoutes: typeof import('../../../src/web-server/routes/channels-routes').default;
   let server: Server;
   let baseUrl = '';
   let tempHome = '';
   let originalCcsHome: string | undefined;
   let originalCcsUnified: string | undefined;
+  let moduleVersion = 0;
 
   beforeAll(async () => {
+    moduleVersion += 1;
+    const actualRuntime = await import(
+      `../../../src/channels/official-channels-runtime?channels-runtime-actual=${moduleVersion}`
+    );
+    mock.module('../../../src/channels/official-channels-runtime', () => ({
+      ...actualRuntime,
+      getOfficialChannelsEnvironmentStatus: () => ({
+        bunInstalled: true,
+        supportedProfiles: ['default', 'account'],
+        stateScopeMessage:
+          "Telegram and Discord tokens live in Claude's machine-level channel state under ~/.claude/channels/. Native Claude sessions share that state unless you manually override the official *_STATE_DIR variables.",
+        claudeVersion: {
+          current: '2.1.83',
+          minimum: '2.1.80',
+          state: 'supported',
+          message: 'Claude Code v2.1.83',
+        },
+        auth: {
+          checked: true,
+          loggedIn: true,
+          authMethod: 'claude.ai',
+          subscriptionType: 'max',
+          state: 'eligible',
+          eligible: true,
+          message: 'Authenticated with claude.ai.',
+        },
+      }),
+    }));
+    ({ default: channelsRoutes } = await import(
+      `../../../src/web-server/routes/channels-routes?channels-routes=${moduleVersion}`
+    ));
+
     const app = express();
     app.use(express.json());
     app.use('/api/channels', channelsRoutes);
@@ -46,6 +79,7 @@ describe('web-server channels-routes', () => {
 
   afterAll(async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
+    mock.restore();
   });
 
   beforeEach(() => {

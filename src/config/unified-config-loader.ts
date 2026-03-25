@@ -1226,6 +1226,21 @@ export function getOfficialChannelsConfig(): OfficialChannelsConfig {
  * Get dashboard_auth configuration with ENV var override.
  * Priority: ENV vars > config.yaml > defaults
  */
+export function isDashboardAuthEnabled(): boolean {
+  const envEnabled = process.env.CCS_DASHBOARD_AUTH_ENABLED;
+
+  if (envEnabled !== undefined) {
+    return envEnabled === 'true' || envEnabled === '1';
+  }
+
+  const config = loadOrCreateUnifiedConfig();
+  return config.dashboard_auth?.enabled ?? false;
+}
+
+/**
+ * Get dashboard_auth configuration with ENV var override.
+ * Priority: ENV vars > config.yaml > defaults
+ */
 export function getDashboardAuthConfig(): DashboardAuthConfig {
   const config = loadOrCreateUnifiedConfig();
 
