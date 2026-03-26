@@ -12,10 +12,15 @@ import {
   buildProxyHeaders,
   buildManagementHeaders,
 } from './proxy-target-resolver';
+import { buildCliproxyStatsFromUsageResponse } from './stats-transformer';
 
 /** Per-account usage statistics */
 export interface AccountUsageStats {
-  /** Account email or identifier */
+  /** Provider-qualified lookup key (for example: "codex:user@example.com") */
+  accountKey: string;
+  /** Canonical provider name reported by CLIProxyAPI */
+  provider: string;
+  /** Raw account email or identifier */
   source: string;
   /** Number of successful requests */
   successCount: number;
@@ -134,79 +139,7 @@ export async function fetchCliproxyStats(port?: number): Promise<CliproxyStats |
     }
 
     const data = (await response.json()) as CliproxyUsageApiResponse;
-    const usage = data.usage;
-
-    // Extract models, providers, and per-account stats from the nested API structure
-    const requestsByModel: Record<string, number> = {};
-    const requestsByProvider: Record<string, number> = {};
-    const accountStats: Record<string, AccountUsageStats> = {};
-    let totalSuccessCount = 0;
-    let totalFailureCount = 0;
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-
-    if (usage?.apis) {
-      for (const [provider, providerData] of Object.entries(usage.apis)) {
-        requestsByProvider[provider] = providerData.total_requests ?? 0;
-        if (providerData.models) {
-          for (const [model, modelData] of Object.entries(providerData.models)) {
-            requestsByModel[model] = modelData.total_requests ?? 0;
-
-            // Aggregate per-account stats from request details
-            if (modelData.details) {
-              for (const detail of modelData.details) {
-                const source = detail.source || 'unknown';
-
-                // Initialize account stats if not exists
-                if (!accountStats[source]) {
-                  accountStats[source] = {
-                    source,
-                    successCount: 0,
-                    failureCount: 0,
-                    totalTokens: 0,
-                  };
-                }
-
-                // Update account stats
-                if (detail.failed) {
-                  accountStats[source].failureCount++;
-                  totalFailureCount++;
-                } else {
-                  accountStats[source].successCount++;
-                  totalSuccessCount++;
-                }
-
-                const tokens = detail.tokens?.total_tokens ?? 0;
-                accountStats[source].totalTokens += tokens;
-                accountStats[source].lastUsedAt = detail.timestamp;
-
-                // Aggregate token breakdowns
-                totalInputTokens += detail.tokens?.input_tokens ?? 0;
-                totalOutputTokens += detail.tokens?.output_tokens ?? 0;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Normalize the response to our interface
-    return {
-      totalRequests: usage?.total_requests ?? 0,
-      successCount: totalSuccessCount,
-      failureCount: totalFailureCount,
-      tokens: {
-        input: totalInputTokens,
-        output: totalOutputTokens,
-        total: usage?.total_tokens ?? 0,
-      },
-      requestsByModel,
-      requestsByProvider,
-      accountStats,
-      quotaExceededCount: usage?.failure_count ?? data.failed_requests ?? 0,
-      retryCount: 0, // API doesn't track retries separately
-      collectedAt: new Date().toISOString(),
-    };
+    return buildCliproxyStatsFromUsageResponse(data);
   } catch {
     // CLIProxyAPI not running or stats endpoint not available
     return null;
