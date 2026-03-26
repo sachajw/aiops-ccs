@@ -1,3 +1,86 @@
+## [7.57.2](https://github.com/kaitranntt/ccs/compare/v7.57.1...v7.57.2) (2026-03-25)
+
+### Bug Fixes
+
+* **ci:** reuse runner bun for AI review ([0e2a2a0](https://github.com/kaitranntt/ccs/commit/0e2a2a01521f18a7206c291a3c8cb815da17e6a8))
+* **config:** close dashboard secret redaction gaps ([e983bed](https://github.com/kaitranntt/ccs/commit/e983bed1da27d0b2eeca29f4d9a7980b7d0ebc91))
+* **config:** harden dashboard config and rollback paths ([37251cd](https://github.com/kaitranntt/ccs/commit/37251cd1f855f0f6235db952e429a0cde8fcc11d))
+* **config:** preserve hidden auth secrets and block scalars ([6ccf53e](https://github.com/kaitranntt/ccs/commit/6ccf53ec7dc88a1297bfbb9518a937cdf2b6348d))
+* **shared-manager:** allow external claude symlink chains ([05dea22](https://github.com/kaitranntt/ccs/commit/05dea222382c06f6bc2d1ee229b0854e7a708c07))
+* **shared-manager:** guard inverse shared symlink loops ([c923f51](https://github.com/kaitranntt/ccs/commit/c923f51cf5e29df77b3af54dbfbc95893ee67fb5))
+
+## [7.57.1](https://github.com/kaitranntt/ccs/compare/v7.57.0...v7.57.1) (2026-03-24)
+
+### Bug Fixes
+
+* **ci:** dedupe AI review comments ([d24efd2](https://github.com/kaitranntt/ccs/commit/d24efd2863e71a7663de8e046e41982b20c7eb27))
+* **ci:** export review runtime paths at run time ([ba41008](https://github.com/kaitranntt/ccs/commit/ba4100878c7d6a268cfc2fec422f01f9dd4aa460))
+
+## [7.57.0](https://github.com/kaitranntt/ccs/compare/v7.56.0...v7.57.0) (2026-03-24)
+
+### Features
+
+* add explicit droid runtime alias surface ([160be31](https://github.com/kaitranntt/ccs/commit/160be319d0b1982c05dc2984673a81aa6ec245b5))
+* **cliproxy:** allow optional provider nicknames ([bdb7ac2](https://github.com/kaitranntt/ccs/commit/bdb7ac2937d144dc2564d09b01e717e8a4bc44eb))
+* make cliproxy provider nicknames optional by default ([4df08f6](https://github.com/kaitranntt/ccs/commit/4df08f6d99e3006107a0431609b7651f13ebc083))
+* **websearch:** add real provider chain ([6c7d215](https://github.com/kaitranntt/ccs/commit/6c7d215ecc7d2a986e922400eb6787f1b402931d))
+
+### Bug Fixes
+
+* **auth:** verify polled oauth account persistence ([09eb01f](https://github.com/kaitranntt/ccs/commit/09eb01f16e0a374198031079d22eeae2a3135810))
+* **ci:** close release automation edge cases ([e06e13a](https://github.com/kaitranntt/ccs/commit/e06e13ad0db514ef6b3ef3af2062cc2ee28a2170))
+* **ci:** harden release automation workflows ([5616c68](https://github.com/kaitranntt/ccs/commit/5616c68471c052e68e65578ac3a48c8998036c86))
+* **ci:** publish docker image from releases ([5c1553e](https://github.com/kaitranntt/ccs/commit/5c1553e6f5722e5f61780a389d4729428529fdc3))
+* **dashboard:** refine api profile quick start state ([aef58d6](https://github.com/kaitranntt/ccs/commit/aef58d66ce69777cf8aba6f43f615560ef820b62))
+* **dashboard:** remove the unnecessary blank on api config page ([3a7e778](https://github.com/kaitranntt/ccs/commit/3a7e778bec13869bf03d3c4c39d2934473eb9fce))
+* harden droid runtime alias resolution ([1f667b5](https://github.com/kaitranntt/ccs/commit/1f667b5953297189dfe8e88112088b11641ba676))
+* **ui:** guard auth success on registered account ([a3478ac](https://github.com/kaitranntt/ccs/commit/a3478ace447d0a9c99c8266e3c0723c0ae29d5f5))
+* **ui:** remove stale dashboard footer gap ([0d59c7a](https://github.com/kaitranntt/ccs/commit/0d59c7a3af35ff5af6768d5d4083abf1ab29d8af))
+
+### Documentation
+
+* **repo:** add security reporting and issue routing ([#769](https://github.com/kaitranntt/ccs/issues/769)) ([185f7f4](https://github.com/kaitranntt/ccs/commit/185f7f469e62a0a86aebf1d9fe98aaa101a3a19b))
+
+### Styles
+
+* **auth:** format cliproxy auth route ([06d098a](https://github.com/kaitranntt/ccs/commit/06d098ae0e981abd9b0dd15397cdac297e7bfc22))
+* **websearch:** format routes after rebase ([83dab7f](https://github.com/kaitranntt/ccs/commit/83dab7fea7ed906da93ea4946fb41c1cec829547))
+
+### Tests
+
+* **cliproxy:** cover optional nickname auth flows ([8347049](https://github.com/kaitranntt/ccs/commit/834704938db14635b87e3a2e337a9d75e3f43d6b))
+* **dashboard:** cover api profile quick start states ([10f2845](https://github.com/kaitranntt/ccs/commit/10f284585f1473f3198288bc0419c58b058442b3))
+
+## [7.56.0](https://github.com/kaitranntt/ccs/compare/v7.55.0...v7.56.0) (2026-03-22)
+
+### Features
+
+* **cliproxy:** add dedicated ai providers workspace ([50c55bb](https://github.com/kaitranntt/ccs/commit/50c55bb108dd03e7e9443a7abea9e2c48b7f3e64))
+* **cliproxy:** redesign ai providers configuration ([77fcd45](https://github.com/kaitranntt/ccs/commit/77fcd45173d4f6074503da33af15c986843b1f91)), closes [#649](https://github.com/kaitranntt/ccs/issues/649)
+* **profiles:** add cliproxy api profile bridge ([287691f](https://github.com/kaitranntt/ccs/commit/287691fa04d3aba136650c55fa13644fe31ef76c)), closes [#649](https://github.com/kaitranntt/ccs/issues/649)
+
+### Bug Fixes
+
+* **cliproxy:** remove control panel setup notice ([e2ca9c2](https://github.com/kaitranntt/ccs/commit/e2ca9c240727893a6ec10fa25c00c0e8ada88623)), closes [#649](https://github.com/kaitranntt/ccs/issues/649)
+* **codex:** recover unsupported live model switches ([9fac214](https://github.com/kaitranntt/ccs/commit/9fac214051a2e30fd58ea7341ebd7f9de112f426))
+* **management:** harden marketplace state transitions ([fc02c4b](https://github.com/kaitranntt/ccs/commit/fc02c4b9682af6205735bdfd221dfb668f1821ae))
+* **management:** localize marketplace registry per instance ([54ea36f](https://github.com/kaitranntt/ccs/commit/54ea36fd18955778a8c15bd825df22618593d9ed))
+* **management:** serialize lifecycle maintenance paths ([36e8ed5](https://github.com/kaitranntt/ccs/commit/36e8ed5d878be13b1dfd7ea1a6e890d575a09360))
+* **management:** serialize marketplace registry reconciliation ([68a5d17](https://github.com/kaitranntt/ccs/commit/68a5d17327e4fc5e3bd5c9fcb48e1bcd96dd92c4))
+* restore parallel-safe validate pipeline ([04fd8ff](https://github.com/kaitranntt/ccs/commit/04fd8ff01997c7475cab0247f8e2ab86e9f0588c))
+* stabilize validate pipeline and cliproxy route tests ([0d90f04](https://github.com/kaitranntt/ccs/commit/0d90f04f3e45c3bc90a74bb8b48677c4d0dd0376))
+* **ui:** reflect cliproxy preset plan tiers ([ef36ad4](https://github.com/kaitranntt/ccs/commit/ef36ad4600282aae7680316a084ec1eb2d74ab63))
+* **ui:** sync codex model catalog defaults ([2114a4b](https://github.com/kaitranntt/ccs/commit/2114a4b96e1b78e8e4f5a00bd29a866cd147348e))
+
+### Documentation
+
+* **architecture:** document marketplace registry ownership ([242a095](https://github.com/kaitranntt/ccs/commit/242a095edb9e32a51fa3f487e9c1fd98dc127e1f))
+* **cliproxy:** document api profile bridge flow ([7d87cfa](https://github.com/kaitranntt/ccs/commit/7d87cfa4482de239a3c2a23257885a882ef53192)), closes [#649](https://github.com/kaitranntt/ccs/issues/649) [#649](https://github.com/kaitranntt/ccs/issues/649)
+
+### Tests
+
+* **management:** cover plugin layout sync lock ([fab0501](https://github.com/kaitranntt/ccs/commit/fab05011f19f5059a09292d2fbb09e8b5cc62f24))
+
 ## [7.55.0](https://github.com/kaitranntt/ccs/compare/v7.54.0...v7.55.0) (2026-03-17)
 
 ### Features

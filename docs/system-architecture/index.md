@@ -1,6 +1,6 @@
 # CCS System Architecture
 
-Last Updated: 2026-03-02
+Last Updated: 2026-03-18
 
 High-level architecture overview for the CCS (Claude Code Switch) system.
 
@@ -86,11 +86,12 @@ Spawn Target Process
   - Spawns: `droid -m custom:ccs-<profile> <args>`
   - Model config includes baseUrl, apiKey, provider
 
-**Binary alias pattern (busybox-style):**
+**Runtime alias pattern (built-in bins / argv[0]-style):**
 
 ```
-ccs  → Target: claude (default)
-ccsd → Target: droid (auto-selected via argv[0])
+ccs        → Target: claude (default)
+ccs-droid  → Target: droid (explicit alias)
+ccsd       → Target: droid (legacy shortcut)
 ```
 
 For details on the adapter architecture, see [Target Adapters](./target-adapters.md).
@@ -233,11 +234,26 @@ For detailed provider flows (CLIProxyAPI, legacy GLMT compatibility, quota manag
             +---> commands/        # Claude Code commands
             +---> skills/          # Custom skills
             +---> agents/          # Agent configurations
+            +---> plugins/
+                    |
+                    +---> cache/               # Shared plugin payload/cache data
+                    +---> marketplaces/        # Shared marketplace payload directories
+                    +---> installed_plugins.json
+
+  ~/.ccs/instances/<profile>/
+    |
+    +---> plugins/
+            |
+            +---> known_marketplaces.json      # Instance-local registry for active CLAUDE_CONFIG_DIR validation
 
   ~/.factory/ (Droid CLI)
     |
     +---> settings.json            # Droid config (custom models)
 ```
+
+Plugin ownership note:
+- `commands/`, `skills/`, `agents/`, and `settings.json` remain shared through the existing symlink/copy flow.
+- Marketplace payload directories stay shared, but `known_marketplaces.json` is reconciled per instance so Claude Code can validate `installLocation` against that instance's `CLAUDE_CONFIG_DIR/plugins/marketplaces`.
 
 ### Config Loading Order
 
@@ -377,7 +393,7 @@ See [Provider Flows](./provider-flows.md) → Authentication Flow section.
         |
         +---> Creates symlink: ccs --> dist/ccs.js
         |
-        +---> Binary alias: ccsd → ccs (auto-selects droid target)
+        +---> Runtime aliases: ccs-droid / ccsd → ccs (auto-select droid target)
         |
         +---> First run creates: ~/.ccs/
 ```

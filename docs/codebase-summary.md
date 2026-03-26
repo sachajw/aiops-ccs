@@ -1,6 +1,6 @@
 # CCS Codebase Summary
 
-Last Updated: 2026-03-17
+Last Updated: 2026-03-18
 
 Comprehensive overview of the modularized CCS codebase structure following the Phase 9 modularization effort (Settings, Analytics, Auth Monitor splits + Test Infrastructure), v7.1 Remote CLIProxy feature, v7.2 Kiro + GitHub Copilot (ghcp) OAuth providers, v7.14 Hybrid Quota Management, v7.34 Image Analysis Hook, and account-context validation hardening.
 
@@ -222,6 +222,13 @@ src/
   - API route rejects `context_group`/`continuity_mode` when mode is not `shared`
   - registry normalization drops malformed persisted `context_group` values
 
+### Shared Plugin Layout
+
+- Shared payload owner: `src/management/shared-manager.ts`.
+- Profile entry point: `src/management/instance-manager.ts`.
+- `plugins/marketplaces/`, `plugins/cache/`, and `installed_plugins.json` stay shared through the `~/.ccs/shared/` topology.
+- `known_marketplaces.json` is now instance-local under `~/.ccs/instances/<profile>/plugins/` so Claude Code validates `installLocation` against the active `CLAUDE_CONFIG_DIR` instead of a last-writer-wins shared file.
+
 ### Target Adapter Module
 
 The targets module provides an extensible interface for dispatching profiles to different CLI implementations.
@@ -239,7 +246,7 @@ The targets module provides an extensible interface for dispatching profiles to 
 2. **Target Resolution** - Priority order:
    - `--target <cli>` flag (CLI argument)
    - Per-profile `target` field (from config.yaml)
-   - `argv[0]` detection (busybox pattern: `ccsd` → droid)
+   - `argv[0]` detection (runtime alias pattern: `ccs-droid` / `ccsd` → droid)
    - Default: `claude`
 
 3. **Implementations:**

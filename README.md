@@ -32,6 +32,13 @@ Run Claude, Gemini, GLM, and any Anthropic-compatible API - concurrently, withou
 Looking for the full setup guide, command reference, provider guides, or troubleshooting?
 Start at **https://docs.ccs.kaitran.ca**.
 
+## Contribute And Report Safely
+
+- Contributing guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Starter work: [good first issue](https://github.com/kaitranntt/ccs/labels/good%20first%20issue), [help wanted](https://github.com/kaitranntt/ccs/labels/help%20wanted)
+- Questions: [open a question issue](https://github.com/kaitranntt/ccs/issues/new/choose)
+- Security reports: [SECURITY.md](./SECURITY.md) and the [private advisory form](https://github.com/kaitranntt/ccs/security/advisories/new)
+
 ### 1. Install
 
 ```bash
@@ -80,7 +87,8 @@ The dashboard provides visual management for all account types:
 
 - **Claude Accounts**: Isolation-first by default (work, personal, client), with explicit shared context opt-in
 - **OAuth Providers**: One-click auth for Gemini, Codex, Antigravity, Kiro, Copilot
-- **API Profiles**: Configure GLM, Kimi with your keys
+- **AI Providers**: Configure Gemini, Codex, Claude, Vertex, and OpenAI-compatible API keys under `CLIProxy -> AI Providers`
+- **API Profiles**: Configure GLM, Kimi, OpenRouter, and other Anthropic-compatible APIs as CCS-native profiles
 - **Factory Droid**: Track Droid install location and BYOK settings health
 - **Updates Center**: Track support rollouts (Droid target, CLIProxy provider changes, WebSearch integrations)
 - **Health Monitor**: Real-time status across all profiles
@@ -148,6 +156,10 @@ The dashboard provides visual management for all account types:
 
 > **OAuth providers** authenticate via browser on first run. Tokens are cached in `~/.ccs/cliproxy/auth/`.
 
+> **Kiro / Copilot account naming:** Manual nicknames are optional. If the provider does not expose an email, CCS derives a safe internal identifier automatically and you can rename it later.
+
+> **AI Providers dashboard:** Configure CLIProxy-managed API key families at `ccs config` -> `CLIProxy` -> `AI Providers`. Use `API Profiles` only for CCS-native Anthropic-compatible profiles.
+
 **Powered by:**
 - [CLIProxyAPIPlus](https://github.com/router-for-me/CLIProxyAPIPlus) - Extended OAuth proxy with Kiro ([@fuko2935](https://github.com/fuko2935), [@Ravens2121](https://github.com/Ravens2121)) and Copilot ([@em4go](https://github.com/em4go)) support
 - [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) - Core OAuth proxy for Gemini, Codex, Antigravity
@@ -182,16 +194,25 @@ ccs api export glm --out ./glm.ccs-profile.json  # Export for cross-device trans
 ccs api import ./glm.ccs-profile.json        # Import exported profile bundle
 ```
 
-### Droid Alias (`argv[0]` pattern)
+### Runtime Aliases (built-in bins / `argv[0]` pattern)
 
-By default, invoking CCS as `ccsd` auto-selects the Droid target:
+Built-in Droid runtime aliases are installed with the package:
 
 ```bash
-ln -s "$(command -v ccs)" /usr/local/bin/ccsd
-ccsd glm
+ccs-droid glm   # explicit alias
+ccsd glm        # legacy shortcut
 ```
 
-Need additional alias names? Set `CCS_DROID_ALIASES` as a comma-separated list (for example: `CCS_DROID_ALIASES=ccs-droid,mydroid`).
+Need additional alias names? First create the matching symlink or another launcher that
+preserves the invoked basename, then map that name with `CCS_TARGET_ALIASES` (preferred) or legacy
+`CCS_DROID_ALIASES`:
+
+```bash
+ln -s "$(command -v ccs)" /usr/local/bin/mydroid
+CCS_TARGET_ALIASES='droid=mydroid'
+# Legacy fallback still supported:
+CCS_DROID_ALIASES='mydroid'
+```
 
 For Factory BYOK compatibility, CCS also stores a per-profile Droid provider hint
 (`CCS_DROID_PROVIDER`) using one of:
@@ -205,9 +226,9 @@ which Droid treats as queued prompt text.
 CCS supports structural Droid command passthrough after profile selection:
 
 ```bash
-ccsd codex exec --skip-permissions-unsafe "fix failing tests"
-ccsd codex --skip-permissions-unsafe "fix failing tests"   # auto-routed to: droid exec ...
-ccsd codex -m custom:gpt-5.3-codex "fix failing tests"     # short exec flags auto-routed too
+ccs-droid codex exec --skip-permissions-unsafe "fix failing tests"
+ccs-droid codex --skip-permissions-unsafe "fix failing tests"   # auto-routed to: droid exec ...
+ccs-droid codex -m custom:gpt-5.3-codex "fix failing tests"     # short exec flags auto-routed too
 ```
 
 If you pass exec-only flags without a prompt (for example `--skip-permissions-unsafe`),
@@ -233,10 +254,10 @@ ccs cliproxy create mycodex --provider codex --target droid
 Built-in CLIProxy providers also work with Droid alias/target override:
 
 ```bash
-ccsd codex
-ccsd agy
+ccs-droid codex
+ccs-droid agy
 ccs codex --target droid
-ccsd codex exec --auto high "triage this bug report"
+ccs-droid codex exec --auto high "triage this bug report"
 ```
 
 Dashboard parity:
@@ -518,24 +539,26 @@ Without Developer Mode, CCS falls back to copying directories.
 
 ## WebSearch
 
-Third-party profiles (Gemini, Codex, GLM, etc.) cannot use Anthropic's native WebSearch. CCS automatically provides web search via CLI tools with automatic fallback.
+Third-party profiles (Gemini, Codex, GLM, etc.) cannot use Anthropic's native WebSearch. CCS intercepts those requests and resolves them through real local search backends instead of depending on another model CLI to do the search.
 
 ### How It Works
 
 | Profile Type | WebSearch Method |
 |--------------|------------------|
 | Claude (native) | Anthropic WebSearch API |
-| Third-party profiles | CLI Tool Fallback Chain |
+| Third-party profiles | Local Search Backend Chain |
 
-### CLI Tool Fallback Chain
+### Local Search Backend Chain
 
-CCS intercepts WebSearch requests and routes them through available CLI tools:
+CCS intercepts WebSearch requests and routes them through deterministic search providers:
 
-| Priority | Tool | Auth | Install |
-|----------|------|------|---------|
-| 1st | Gemini CLI | OAuth (free) | `npm install -g @google/gemini-cli` |
-| 2nd | OpenCode | OAuth (free) | `curl -fsSL https://opencode.ai/install \| bash` |
-| 3rd | Grok CLI | API Key | `npm install -g @vibe-kit/grok-cli` |
+| Priority | Provider | Setup | Notes |
+|----------|----------|-------|-------|
+| 1st | Exa | `EXA_API_KEY` | API-backed search with extracted content |
+| 2nd | Tavily | `TAVILY_API_KEY` | Agent-oriented search API |
+| 3rd | Brave Search | `BRAVE_API_KEY` | Cleaner API-backed results |
+| 4th | DuckDuckGo | None | Built-in default fallback |
+| 5th | Gemini / OpenCode / Grok | Optional | Legacy compatibility fallback only |
 
 ### Configuration
 
@@ -544,17 +567,21 @@ Configure via dashboard (**Settings** page) or `~/.ccs/config.yaml`:
 ```yaml
 websearch:
   enabled: true                    # Enable/disable (default: true)
-  gemini:
-    enabled: true                  # Use Gemini CLI (default: true)
-    model: gemini-2.5-flash        # Model to use
-  opencode:
-    enabled: true                  # Use OpenCode as fallback
-  grok:
-    enabled: false                 # Requires XAI_API_KEY
+  providers:
+    exa:
+      enabled: false               # Enable when EXA_API_KEY is set
+    tavily:
+      enabled: false               # Enable when TAVILY_API_KEY is set
+    duckduckgo:
+      enabled: true                # Built-in zero-setup fallback
+    brave:
+      enabled: false               # Enable when BRAVE_API_KEY is set
+    gemini:
+      enabled: false               # Optional legacy fallback
 ```
 
 > [!TIP]
-> **Gemini CLI** is recommended - free OAuth authentication with 1000 requests/day. Just run `gemini` once to authenticate via browser.
+> **DuckDuckGo** still works out of the box. Add **Exa**, **Tavily**, or **Brave Search** if you want API-backed results, then keep Gemini/OpenCode/Grok only if you explicitly want legacy fallback behavior.
 
 See [docs/websearch.md](./docs/websearch.md) for detailed configuration and troubleshooting.
 
@@ -662,7 +689,7 @@ bun remove -g @kaitranntt/ccs
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md). For suspected vulnerabilities, use [SECURITY.md](./SECURITY.md) instead of a public issue.
 
 <br>
 
@@ -680,6 +707,6 @@ MIT License - see [LICENSE](LICENSE).
 
 ---
 
-**[ccs.kaitran.ca](https://ccs.kaitran.ca)** | **[docs.ccs.kaitran.ca](https://docs.ccs.kaitran.ca)** | [Report Issues](https://github.com/kaitranntt/ccs/issues) | [Star on GitHub](https://github.com/kaitranntt/ccs)
+**[ccs.kaitran.ca](https://ccs.kaitran.ca)** | **[docs.ccs.kaitran.ca](https://docs.ccs.kaitran.ca)** | [Issue Templates](https://github.com/kaitranntt/ccs/issues/new/choose) | [Private Security Report](https://github.com/kaitranntt/ccs/security/advisories/new) | [Star on GitHub](https://github.com/kaitranntt/ccs)
 
 </div>
