@@ -9,16 +9,30 @@ import { getWebSearchReadiness, getWebSearchCliProviders } from '../../utils/web
 import {
   applyWebSearchApiKeyUpdates,
   getWebSearchApiKeyStates,
+  WEBSEARCH_API_KEY_PROVIDERS,
   type WebSearchApiKeyProviderId,
 } from '../../utils/websearch/provider-secrets';
+import { requireLocalAccessWhenAuthDisabled } from '../middleware/auth-middleware';
 
 const router = Router();
+const WEBSEARCH_LOCAL_ACCESS_ERROR =
+  'WebSearch endpoints require localhost access when dashboard auth is disabled.';
 
 type WebSearchApiKeyUpdates = Partial<Record<WebSearchApiKeyProviderId, string | null>>;
 
 interface WebSearchDashboardPayload extends Partial<WebSearchConfig> {
   apiKeys?: WebSearchApiKeyUpdates;
 }
+
+function isWebSearchApiKeyProviderId(value: string): value is WebSearchApiKeyProviderId {
+  return Object.prototype.hasOwnProperty.call(WEBSEARCH_API_KEY_PROVIDERS, value);
+}
+
+router.use((req: Request, res: Response, next) => {
+  if (requireLocalAccessWhenAuthDisabled(req, res, WEBSEARCH_LOCAL_ACCESS_ERROR)) {
+    next();
+  }
+});
 
 /**
  * GET /api/websearch - Get WebSearch configuration
@@ -41,6 +55,16 @@ router.get('/', (_req: Request, res: Response): void => {
  * Body: WebSearchConfig fields (enabled, providers)
  */
 router.put('/', (req: Request, res: Response): void => {
+  if (
+    req.body === null ||
+    req.body === undefined ||
+    typeof req.body !== 'object' ||
+    Array.isArray(req.body)
+  ) {
+    res.status(400).json({ error: 'Invalid request body. Must be an object.' });
+    return;
+  }
+
   const { enabled, providers, apiKeys } = req.body as WebSearchDashboardPayload;
 
   // Validate enabled
@@ -50,19 +74,25 @@ router.put('/', (req: Request, res: Response): void => {
   }
 
   // Validate providers if specified
-  if (providers !== undefined && typeof providers !== 'object') {
+  if (
+    providers !== undefined &&
+    (providers === null || Array.isArray(providers) || typeof providers !== 'object')
+  ) {
     res.status(400).json({ error: 'Invalid value for providers. Must be an object.' });
     return;
   }
 
-  if (apiKeys !== undefined && typeof apiKeys !== 'object') {
+  if (
+    apiKeys !== undefined &&
+    (apiKeys === null || Array.isArray(apiKeys) || typeof apiKeys !== 'object')
+  ) {
     res.status(400).json({ error: 'Invalid value for apiKeys. Must be an object.' });
     return;
   }
 
   if (apiKeys) {
     for (const [providerId, value] of Object.entries(apiKeys)) {
-      if (!['exa', 'tavily', 'brave'].includes(providerId)) {
+      if (!isWebSearchApiKeyProviderId(providerId)) {
         res.status(400).json({ error: `Unsupported WebSearch provider: ${providerId}` });
         return;
       }
