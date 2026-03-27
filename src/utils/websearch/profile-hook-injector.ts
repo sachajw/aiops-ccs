@@ -15,17 +15,10 @@ import { getWebSearchConfig } from '../../config/unified-config-loader';
 import { removeHookConfig } from './hook-config';
 import { getCcsDir } from '../config-manager';
 import { isCcsWebSearchHook, deduplicateCcsHooks } from './hook-utils';
-import { installWebSearchHook } from './hook-installer';
+import { getMigrationMarkerPath, installWebSearchHook } from './hook-installer';
 
 // Valid profile name pattern (alphanumeric, dash, underscore only)
 const VALID_PROFILE_NAME = /^[a-zA-Z0-9_-]+$/;
-
-/**
- * Get migration marker path (respects CCS_HOME for test isolation)
- */
-function getMigrationMarkerPath(): string {
-  return path.join(getCcsDir(), '.hook-migrated');
-}
 
 /**
  * Check if CCS WebSearch hook exists in settings
@@ -90,6 +83,14 @@ export function ensureProfileHooks(profileName: string): boolean {
       return false;
     }
 
+    // Keep the injected command target valid for all profile types, not just CLIProxy.
+    if (!installWebSearchHook() && !fs.existsSync(getHookPath())) {
+      if (process.env.CCS_DEBUG) {
+        console.error(warn('WebSearch hook binary is missing and could not be installed'));
+      }
+      return false;
+    }
+
     // One-time migration from global settings
     migrateGlobalHook();
 
@@ -99,14 +100,6 @@ export function ensureProfileHooks(profileName: string): boolean {
     // Ensure CCS dir exists
     if (!fs.existsSync(ccsDir)) {
       fs.mkdirSync(ccsDir, { recursive: true, mode: 0o700 });
-    }
-
-    // Keep the injected command target valid for all profile types, not just CLIProxy.
-    if (!installWebSearchHook() && !fs.existsSync(getHookPath())) {
-      if (process.env.CCS_DEBUG) {
-        console.error(warn('WebSearch hook binary is missing and could not be installed'));
-      }
-      return false;
     }
 
     const settingsPath = path.join(ccsDir, `${profileName}.settings.json`);
@@ -241,21 +234,5 @@ function updateHookTimeoutIfNeeded(
       console.error(warn(`updateHookTimeoutIfNeeded failed: ${(error as Error).message}`));
     }
     return false;
-  }
-}
-
-/**
- * Remove migration marker (called during uninstall)
- */
-export function removeMigrationMarker(): void {
-  try {
-    const markerPath = getMigrationMarkerPath();
-    if (fs.existsSync(markerPath)) {
-      fs.unlinkSync(markerPath);
-    }
-  } catch (error) {
-    if (process.env.CCS_DEBUG) {
-      console.error(warn(`removeMigrationMarker failed: ${(error as Error).message}`));
-    }
   }
 }

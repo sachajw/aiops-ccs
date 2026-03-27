@@ -19,7 +19,7 @@ export { getHookPath, getWebSearchHookConfig } from './hook-config';
 // Hook file name
 const WEBSEARCH_HOOK = 'websearch-transformer.cjs';
 
-function getMigrationMarkerPath(): string {
+export function getMigrationMarkerPath(): string {
   return path.join(getCcsDir(), '.hook-migrated');
 }
 

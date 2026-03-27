@@ -40,6 +40,7 @@ export {
   hasWebSearchHook,
   getWebSearchHookConfig,
   installWebSearchHook,
+  removeMigrationMarker,
   uninstallWebSearchHook,
 } from './hook-installer';
 
@@ -61,4 +62,4 @@ export {
 export { WEBSEARCH_API_KEY_PROVIDERS, getWebSearchApiKeyStates } from './provider-secrets';
 
 // Profile Hook Injection
-export { ensureProfileHooks, removeMigrationMarker } from './profile-hook-injector';
+export { ensureProfileHooks } from './profile-hook-injector';
