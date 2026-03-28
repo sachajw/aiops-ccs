@@ -20,6 +20,7 @@ import type {
 
 const LOCAL_DOCKER_SYNC_TIMEOUT_MS = 10_000;
 const REMOTE_DOCKER_SYNC_TIMEOUT_MS = 30_000;
+const REMOTE_DOCKER_BUILD_TIMEOUT_MS = 300_000;
 
 function quotePosix(value: string): string {
   return `'${value.replace(/'/g, `'\"'\"'`)}'`;
@@ -194,11 +195,16 @@ export class DockerExecutor {
       this.stageRemoteAssets(options.host);
     }
     this.ensureSuccess(
-      this.runCompose(['up', '-d', '--build'], options, {
-        CCS_NPM_VERSION: this.getInstalledCcsVersion(),
-        CCS_DASHBOARD_PORT: String(options.port),
-        CCS_CLIPROXY_PORT: String(options.proxyPort),
-      }),
+      this.runCompose(
+        ['up', '-d', '--build'],
+        options,
+        {
+          CCS_NPM_VERSION: this.getInstalledCcsVersion(),
+          CCS_DASHBOARD_PORT: String(options.port),
+          CCS_CLIPROXY_PORT: String(options.proxyPort),
+        },
+        REMOTE_DOCKER_BUILD_TIMEOUT_MS
+      ),
       'Docker stack startup',
       options
     );
@@ -225,7 +231,11 @@ export class DockerExecutor {
     const script =
       'npm install -g @kaitranntt/ccs@latest --force && ccs cliproxy --latest && supervisorctl -c /etc/supervisord.conf restart ccs-dashboard cliproxy';
     this.ensureSuccess(
-      this.runDocker(['exec', DOCKER_CONTAINER_NAME, 'sh', '-lc', script], options),
+      this.runDocker(
+        ['exec', DOCKER_CONTAINER_NAME, 'sh', '-lc', script],
+        options,
+        REMOTE_DOCKER_BUILD_TIMEOUT_MS
+      ),
       'Docker stack update',
       options
     );
@@ -279,7 +289,8 @@ export class DockerExecutor {
   private runCompose(
     args: string[],
     options: DockerCommandTarget,
-    env: Record<string, string> = {}
+    env: Record<string, string> = {},
+    timeoutMs?: number
   ): DockerCommandResult {
     if (!options.host) {
       const prefix = this.resolveLocalComposePrefix();
@@ -289,22 +300,30 @@ export class DockerExecutor {
         cwd: path.dirname(this.assets.composeFile),
         env: { ...process.env, ...env },
         remote: false,
+        timeoutMs,
       });
     }
 
-    const envPrefix = Object.entries(env)
-      .map(([key, value]) => `${key}=${quotePosix(value)}`)
-      .join(' ');
+    const envExports = Object.entries(env)
+      .map(([key, value]) => `export ${key}=${quotePosix(value)}`)
+      .join(' && ');
     const composeArgs = ['-f', path.basename(this.assets.composeFile), ...args];
-    const remoteCommand = `cd ${DOCKER_REMOTE_DIR} && ${envPrefix ? `${envPrefix} ` : ''}${buildRemoteComposeCommand(composeArgs)}`;
-    return this.runSync('ssh', [options.host, remoteCommand], { remote: true });
+    const remoteCommand = `cd ${DOCKER_REMOTE_DIR}${envExports ? ` && ${envExports}` : ''} && ${buildRemoteComposeCommand(composeArgs)}`;
+    return this.runSync('ssh', [options.host, remoteCommand], { remote: true, timeoutMs });
   }
 
-  private runDocker(args: string[], options: DockerCommandTarget): DockerCommandResult {
+  private runDocker(
+    args: string[],
+    options: DockerCommandTarget,
+    timeoutMs?: number
+  ): DockerCommandResult {
     if (!options.host) {
-      return this.runSync('docker', args);
+      return this.runSync('docker', args, { timeoutMs });
     }
-    return this.runSync('ssh', [options.host, buildRemoteDockerCommand(args)], { remote: true });
+    return this.runSync('ssh', [options.host, buildRemoteDockerCommand(args)], {
+      remote: true,
+      timeoutMs,
+    });
   }
 
   private async runDockerStreaming(args: string[], options: DockerCommandTarget): Promise<void> {
