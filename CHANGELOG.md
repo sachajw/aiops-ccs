@@ -1,3 +1,9 @@
+## [7.61.1](https://github.com/kaitranntt/ccs/compare/v7.61.0...v7.61.1) (2026-03-28)
+
+### Bug Fixes
+
+* **ci:** require explicit /review command for AI review reruns ([3ebf17f](https://github.com/kaitranntt/ccs/commit/3ebf17f1701f9d7fd60aade0ec6bd8147b91e761))
+
 ## [7.61.0](https://github.com/kaitranntt/ccs/compare/v7.60.1...v7.61.0) (2026-03-27)
 
 ### Features

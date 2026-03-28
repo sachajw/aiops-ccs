@@ -24,11 +24,12 @@ on:
         required: true
         type: string
 
-# Smart concurrency: Prevents self-cancellation when bot posts review comment
+# Smart concurrency: Prevents self-cancellation when non-command comments arrive
 #
-# Problem: When the bot posts a review comment, GitHub fires an issue_comment event.
-# This new workflow run joins the same concurrency group and cancels the in-progress
-# run BEFORE job `if` conditions are evaluated - causing "operation was canceled" error.
+# Problem: When a bot or maintainer posts a normal PR note, GitHub fires an
+# issue_comment event. A loose substring match on "/review" can accidentally
+# treat text like "CI/review" as a manual command, which joins the PR
+# concurrency group and cancels the in-progress review.
 #
 # Solution: Non-actionable triggers (bot comments, comments without /review) get a
 # unique per-run group, while legitimate triggers share the PR-based group for proper
@@ -38,7 +39,7 @@ concurrency:
     ai-review-${{
       github.event_name == 'issue_comment' && (
         github.event.comment.user.type == 'Bot' ||
-        !contains(github.event.comment.body, '/review')
+        !startsWith(github.event.comment.body, '/review')
       ) && format('skip-{0}', github.run_id) ||
       github.event.pull_request.number ||
       github.event.issue.number ||
@@ -66,13 +67,13 @@ jobs:
 
     # Conditions:
     # - PR event: on opened, synchronize (new commits), or reopened
-    # - Comment event: only if it's a PR, contains /review, and NOT from a bot
+    # - Comment event: only if it's a PR, starts with /review, and NOT from a bot
     if: >
       github.event_name == 'pull_request_target' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
        github.event.issue.pull_request &&
-       contains(github.event.comment.body, '/review') &&
+       startsWith(github.event.comment.body, '/review') &&
        github.event.comment.user.type != 'Bot' &&
        contains(fromJSON('["COLLABORATOR","MEMBER","OWNER"]'), github.event.comment.author_association))
 
