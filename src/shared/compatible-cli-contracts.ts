@@ -131,6 +131,7 @@ export interface CodexRawConfigResponse {
   rawText: string;
   config: Record<string, unknown> | null;
   parseError: string | null;
+  readError: string | null;
 }
 
 export interface CodexTopLevelSettingsPatch {

@@ -97,6 +97,7 @@ export function useCodex() {
           rawText: variables.rawText,
           config: parsed.config,
           parseError: parsed.parseError,
+          readError: null,
         };
       });
       queryClient.invalidateQueries({ queryKey: ['codex-diagnostics'] });

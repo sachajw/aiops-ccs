@@ -28,6 +28,13 @@ function buildConfigOverrideArgs(overrides: string[]): string[] {
   return overrides.flatMap((override) => ['-c', override]);
 }
 
+function buildConfigOverrideSupportError(binaryInfo?: TargetBinaryInfo): Error {
+  const versionSummary = binaryInfo?.version ? ` (${binaryInfo.version})` : '';
+  return new Error(
+    `Codex CLI${versionSummary} does not advertise --config overrides. Upgrade Codex before using CCS-backed Codex profiles or runtime reasoning overrides.`
+  );
+}
+
 function findDisallowedCodexManagedFlags(args: string[]): string[] {
   const disallowed = new Set<string>();
 
@@ -91,6 +98,9 @@ export class CodexAdapter implements TargetAdapter {
 
     if (profileType === 'default') {
       if (reasoningOverride) {
+        if (!codexBinarySupportsConfigOverrides(options?.binaryInfo)) {
+          throw buildConfigOverrideSupportError(options?.binaryInfo);
+        }
         return [
           ...buildConfigOverrideArgs([
             `model_reasoning_effort=${formatTomlString(reasoningOverride)}`,
@@ -102,10 +112,7 @@ export class CodexAdapter implements TargetAdapter {
     }
 
     if (!codexBinarySupportsConfigOverrides(options?.binaryInfo)) {
-      const versionSummary = options?.binaryInfo?.version ? ` (${options.binaryInfo.version})` : '';
-      throw new Error(
-        `Codex CLI${versionSummary} does not advertise --config overrides. Upgrade Codex before using CCS-backed Codex profiles.`
-      );
+      throw buildConfigOverrideSupportError(options?.binaryInfo);
     }
 
     if (!creds?.baseUrl?.trim() || !creds.apiKey?.trim()) {

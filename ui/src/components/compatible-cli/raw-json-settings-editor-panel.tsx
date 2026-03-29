@@ -12,13 +12,16 @@ interface RawConfigEditorPanelProps {
   pathLabel: string;
   loading: boolean;
   parseWarning: string | null | undefined;
+  readWarning?: string | null | undefined;
   value: string;
   dirty: boolean;
+  readOnly?: boolean;
   saving: boolean;
   saveDisabled: boolean;
   onChange: (nextValue: string) => void;
   onSave: () => Promise<void> | void;
   onRefresh: () => Promise<void> | void;
+  onDiscard?: () => void;
   language?: 'json' | 'yaml' | 'toml';
   loadingLabel?: string;
   parseWarningLabel?: string;
@@ -30,13 +33,16 @@ export function RawConfigEditorPanel({
   pathLabel,
   loading,
   parseWarning,
+  readWarning,
   value,
   dirty,
+  readOnly = false,
   saving,
   saveDisabled,
   onChange,
   onSave,
   onRefresh,
+  onDiscard,
   language = 'json',
   loadingLabel = 'Loading settings.json...',
   parseWarningLabel = 'Parse warning',
@@ -76,11 +82,16 @@ export function RawConfigEditorPanel({
             )}
             Save
           </Button>
+          {onDiscard ? (
+            <Button variant="outline" size="sm" onClick={onDiscard} disabled={!dirty || loading}>
+              Discard
+            </Button>
+          ) : null}
           <Button variant="outline" size="sm" onClick={handleCopy} disabled={!value}>
             <Copy className="h-4 w-4 mr-1" />
             {copied ? 'Copied' : 'Copy'}
           </Button>
-          <Button variant="outline" size="sm" onClick={onRefresh}>
+          <Button variant="outline" size="sm" onClick={onRefresh} aria-label="Refresh raw config">
             <RefreshCw className={cn('h-4 w-4', loading ? 'animate-spin' : '')} />
           </Button>
         </div>
@@ -100,12 +111,18 @@ export function RawConfigEditorPanel({
                 {parseWarningLabel}: {parseWarning}
               </div>
             )}
+            {readWarning && (
+              <div className="mx-4 mt-4 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                Read-only: {readWarning}
+              </div>
+            )}
             <div className="min-h-0 flex-1 p-4 pt-3">
               <div className="h-full rounded-md border overflow-hidden bg-background">
                 <CodeEditor
                   value={value}
                   onChange={onChange}
                   language={language}
+                  readonly={readOnly}
                   minHeight="100%"
                   heightMode="fill-parent"
                 />

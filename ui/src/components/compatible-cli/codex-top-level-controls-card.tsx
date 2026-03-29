@@ -32,6 +32,32 @@ function withCurrentValue(options: string[], current: string | null | undefined)
   return current && !options.includes(current) ? [current, ...options] : options;
 }
 
+function buildTopLevelPatch(
+  initialValues: CodexTopLevelSettingsView,
+  draft: CodexTopLevelSettingsView
+): CodexTopLevelSettingsPatch {
+  const patch: CodexTopLevelSettingsPatch = {};
+
+  if (draft.model !== initialValues.model) patch.model = draft.model;
+  if (draft.modelReasoningEffort !== initialValues.modelReasoningEffort) {
+    patch.modelReasoningEffort = draft.modelReasoningEffort;
+  }
+  if (draft.modelProvider !== initialValues.modelProvider) {
+    patch.modelProvider = draft.modelProvider;
+  }
+  if (draft.approvalPolicy !== initialValues.approvalPolicy) {
+    patch.approvalPolicy = draft.approvalPolicy;
+  }
+  if (draft.sandboxMode !== initialValues.sandboxMode) patch.sandboxMode = draft.sandboxMode;
+  if (draft.webSearch !== initialValues.webSearch) patch.webSearch = draft.webSearch;
+  if (draft.toolOutputTokenLimit !== initialValues.toolOutputTokenLimit) {
+    patch.toolOutputTokenLimit = draft.toolOutputTokenLimit;
+  }
+  if (draft.personality !== initialValues.personality) patch.personality = draft.personality;
+
+  return patch;
+}
+
 interface TopLevelControlsFormProps {
   initialValues: CodexTopLevelSettingsView;
   providerNames: string[];
@@ -62,10 +88,9 @@ function TopLevelControlsForm({
     draft.sandboxMode
   );
   const webSearchOptions = withCurrentValue(['cached', 'live', 'disabled'], draft.webSearch);
-  const personalityOptions = withCurrentValue(
-    ['default', 'pragmatic', 'concise', 'direct'],
-    draft.personality
-  );
+  const personalityOptions = withCurrentValue(['none', 'friendly', 'pragmatic'], draft.personality);
+  const patch = buildTopLevelPatch(initialValues, draft);
+  const hasChanges = Object.keys(patch).length > 0;
 
   return (
     <>
@@ -242,7 +267,7 @@ function TopLevelControlsForm({
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={() => onSave(draft)} disabled={disabled || saving}>
+        <Button onClick={() => onSave(patch)} disabled={disabled || saving || !hasChanges}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
           Save top-level settings
         </Button>
@@ -264,7 +289,7 @@ export function CodexTopLevelControlsCard({
       title="Top-level controls"
       badge="config.toml"
       icon={<SlidersHorizontal className="h-4 w-4" />}
-      description="Structured controls for the stable top-level Codex settings users touch most often."
+      description="Structured controls for the stable top-level Codex settings users touch most often. Unsupported upstream shapes stay untouched and should be edited in raw TOML."
       disabledReason={disabledReason}
     >
       <TopLevelControlsForm

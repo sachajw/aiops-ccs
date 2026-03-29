@@ -198,14 +198,14 @@ Resolves which adapter to use via `resolveTargetType()`:
 ```
 1. --target <name> flag (highest priority)
    ↓
-2. Profile config: profileConfig.target field
-   ↓
-3. argv[0] detection (runtime alias pattern):
+2. argv[0] detection (runtime alias pattern):
    - ccs-droid → droid
    - ccsd → droid
    - ccs-codex → codex
    - ccsx → codex
    - ccs → default
+   ↓
+3. Profile config: profileConfig.target field
    ↓
 4. Fallback: 'claude' (lowest priority)
 ```

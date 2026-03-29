@@ -69,7 +69,7 @@ src/
 │   ├── index.ts              # Barrel export
 │   ├── target-adapter.ts     # TargetAdapter interface contract
 │   ├── target-registry.ts    # Registry for runtime adapter lookup
-│   ├── target-resolver.ts    # Resolution logic (flag > config > argv[0])
+│   ├── target-resolver.ts    # Resolution logic (flag > argv[0] > config)
 │   ├── target-metadata.ts    # Runtime vs persisted target metadata and alias lists
 │   ├── target-runtime-compatibility.ts # Guardrails for target/profile combinations
 │   ├── claude-adapter.ts     # Claude Code CLI implementation
@@ -254,7 +254,7 @@ src/
 - Adapter behavior: `src/targets/codex-adapter.ts` and `src/targets/codex-detector.ts` launch native Codex without rewriting `~/.codex/config.toml`; CCS-backed routes use transient `codex -c key=value` overrides and env-key injection.
 - Dashboard control center: `src/web-server/services/codex-dashboard-service.ts`, `src/web-server/routes/codex-routes.ts`, `ui/src/pages/codex.tsx`, and `ui/src/components/compatible-cli/codex-*.tsx` expose a split-view Codex dashboard with guided editors for top-level settings, trust, profiles, providers, MCP servers, and feature flags plus a raw TOML fallback.
 - Structured-edit boundary: guided Codex saves intentionally reserialize the whole TOML document, so comments/formatting are normalized and the raw editor remains the fidelity-preserving escape hatch.
-- Follow-up behavior: structured saves refresh the raw snapshot immediately, structured controls stay disabled while raw TOML is dirty or invalid, project trust paths must be absolute or `~/...`, and feature flags can be reset to default.
+- Follow-up behavior: structured saves refresh the raw snapshot immediately, refresh discards stale raw drafts, structured controls stay disabled while raw TOML is dirty/invalid/unreadable, project trust paths must be absolute or `~/...`, unsupported upstream top-level shapes are preserved instead of deleted, and feature flags can be reset to default.
 - Supported Codex flows in v1:
   - `default`
   - CLIProxy provider `codex`
@@ -279,8 +279,8 @@ The targets module provides an extensible interface for dispatching profiles to 
 
 2. **Target Resolution** - Priority order:
    - `--target <cli>` flag (CLI argument)
-   - Per-profile `target` field (from config.yaml)
    - `argv[0]` detection (runtime alias pattern: `ccs-droid` / `ccsd` → droid)
+   - Per-profile `target` field (from config.yaml)
    - Default: `claude`
 
 3. **Implementations:**

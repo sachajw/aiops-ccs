@@ -184,6 +184,7 @@ export function readCodexMcpServers(config: Record<string, unknown> | null): Cod
       const server = asObject(value);
       if (!server) return null;
       const transport = asString(server.command) ? 'stdio' : 'streamable-http';
+      const startupTimeoutMs = asNumber(server.startup_timeout_ms);
       return {
         name,
         transport,
@@ -192,7 +193,9 @@ export function readCodexMcpServers(config: Record<string, unknown> | null): Cod
         url: asString(server.url),
         enabled: server.enabled !== false,
         required: server.required === true,
-        startupTimeoutSec: asNumber(server.startup_timeout_sec),
+        startupTimeoutSec:
+          asNumber(server.startup_timeout_sec) ??
+          (startupTimeoutMs !== null ? startupTimeoutMs / 1000 : null),
         toolTimeoutSec: asNumber(server.tool_timeout_sec),
         enabledTools: asStringArray(server.enabled_tools),
         disabledTools: asStringArray(server.disabled_tools),

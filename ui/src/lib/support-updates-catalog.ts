@@ -87,17 +87,14 @@ export const SUPPORT_NOTICES: SupportNotice[] = [
         command: 'ccs codex --target codex "your prompt"',
       },
       {
-        id: 'open-cliproxy-codex',
-        label: 'Open Codex provider settings',
-        description: 'Review Codex provider and bridge flows in the dashboard.',
+        id: 'open-codex-dashboard',
+        label: 'Open Codex dashboard',
+        description: 'Review Codex runtime support, config layers, and dashboard setup flows.',
         type: 'route',
-        path: '/cliproxy',
+        path: '/codex',
       },
     ],
-    routes: [
-      { label: 'CLIProxy', path: '/cliproxy' },
-      { label: 'API Profiles', path: '/providers' },
-    ],
+    routes: [{ label: 'Codex CLI', path: '/codex' }],
     commands: ['ccs-codex', 'ccsx', 'ccs codex --target codex "your prompt"'],
   },
   {
@@ -243,10 +240,7 @@ export const CLI_SUPPORT_ENTRIES: CliSupportEntry[] = [
       auth: 'Native Codex auth for default mode, env_key injection for CCS-backed routes',
       model: 'Native Codex config or routed Codex model mapping from CLIProxy',
     },
-    routes: [
-      { label: 'CLIProxy', path: '/cliproxy' },
-      { label: 'API Profiles', path: '/providers' },
-    ],
+    routes: [{ label: 'Codex CLI', path: '/codex' }],
     commands: ['ccs-codex', 'ccsx', 'ccs codex --target codex', 'ccs codex-api --target codex'],
     notes:
       'Runtime-only in v1. Saved default targets for API profiles and CLIProxy variants remain claude or droid.',

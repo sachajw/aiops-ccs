@@ -46,16 +46,22 @@ export function CodexPage() {
     : { valid: true as const };
   const controlsConfig = rawConfig?.config ?? null;
   const structuredControlsDisabled =
-    rawConfigLoading || !rawConfig || rawConfigDirty || rawConfig?.parseError !== null;
+    rawConfigLoading ||
+    !rawConfig ||
+    rawConfigDirty ||
+    rawConfig?.parseError !== null ||
+    rawConfig?.readError !== null;
   const controlsDisabledReason = rawConfigError
     ? 'Structured controls unavailable: failed to load the current config.toml.'
-    : rawConfigDirty
-      ? rawEditorValidation.valid
-        ? 'Save or discard raw TOML edits before using structured controls.'
-        : 'Fix or discard raw TOML edits before using structured controls.'
-      : rawConfig?.parseError
-        ? `Structured controls disabled: ${rawConfig.parseError}`
-        : null;
+    : rawConfig?.readError
+      ? `Structured controls unavailable: ${rawConfig.readError}`
+      : rawConfigDirty
+        ? rawEditorValidation.valid
+          ? 'Save or discard raw TOML edits before using structured controls.'
+          : 'Fix or discard raw TOML edits before using structured controls.'
+        : rawConfig?.parseError
+          ? `Structured controls disabled: ${rawConfig.parseError}`
+          : null;
 
   const topLevelSettings = useMemo(
     () => readCodexTopLevelSettings(controlsConfig),
@@ -82,7 +88,21 @@ export function CodexPage() {
   };
 
   const refreshAll = async () => {
-    await Promise.all([refetchDiagnostics(), refetchRawConfig()]);
+    try {
+      const results = await Promise.all([refetchDiagnostics(), refetchRawConfig()]);
+      const refreshFailed = results.some(
+        (result) => !result || result.status === 'error' || result.isError || result.error
+      );
+
+      if (refreshFailed) {
+        toast.error('Failed to refresh Codex snapshot. Raw edits were kept.');
+        return;
+      }
+
+      setRawDraftText(null);
+    } catch (error) {
+      toast.error((error as Error).message || 'Failed to refresh Codex snapshot.');
+    }
   };
 
   const handleSaveRawConfig = async () => {
@@ -206,17 +226,24 @@ export function CodexPage() {
             parseWarning={
               rawEditorValidation.valid ? rawConfig?.parseError : rawEditorValidation.error
             }
+            readWarning={rawConfig?.readError}
             value={rawEditorText}
             dirty={rawConfigDirty}
+            readOnly={Boolean(rawConfig?.readError)}
             saving={isSavingRawConfig}
             saveDisabled={
-              !rawConfigDirty || isSavingRawConfig || rawConfigLoading || !rawEditorValidation.valid
+              !rawConfigDirty ||
+              isSavingRawConfig ||
+              rawConfigLoading ||
+              !rawEditorValidation.valid ||
+              Boolean(rawConfig?.readError)
             }
             onChange={(next) => {
               setRawEditorDraftText(next);
             }}
             onSave={handleSaveRawConfig}
             onRefresh={refreshAll}
+            onDiscard={() => setRawDraftText(null)}
             language="toml"
             loadingLabel="Loading config.toml..."
             parseWarningLabel="TOML warning"

@@ -51,7 +51,7 @@ function ProjectTrustComposer({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="trusted">trusted</SelectItem>
-          <SelectItem value="ask">ask</SelectItem>
+          <SelectItem value="untrusted">untrusted</SelectItem>
         </SelectContent>
       </Select>
       <Button onClick={() => onSave(pathDraft, trustLevel)} disabled={disabled || saving}>
@@ -117,7 +117,7 @@ export function CodexProjectTrustCard({
                   variant="ghost"
                   size="sm"
                   onClick={() =>
-                    onSave(entry.path, entry.trustLevel === 'trusted' ? 'ask' : 'trusted')
+                    onSave(entry.path, entry.trustLevel === 'trusted' ? 'untrusted' : 'trusted')
                   }
                   disabled={disabled || saving}
                 >

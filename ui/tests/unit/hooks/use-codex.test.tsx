@@ -77,6 +77,7 @@ const initialRawConfigResponse = {
   rawText: 'model = "gpt-5.3-codex"\n',
   config: { model: 'gpt-5.3-codex' },
   parseError: null,
+  readError: null,
 };
 
 const patchedRawConfigResponse = {
@@ -88,6 +89,7 @@ const patchedRawConfigResponse = {
   rawText: 'model = "gpt-5.4"\n',
   config: { model: 'gpt-5.4' },
   parseError: null,
+  readError: null,
 };
 
 const wrapper = ({ children }: { children: ReactNode }) => <AllProviders>{children}</AllProviders>;

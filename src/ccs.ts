@@ -90,7 +90,11 @@ interface DetectedProfile {
 interface RuntimeReasoningResolution {
   argsWithoutReasoningFlags: string[];
   reasoningOverride: string | number | undefined;
+  reasoningSource: 'flag' | 'env' | undefined;
+  sourceDisplay: string | undefined;
 }
+
+const CODEX_RUNTIME_REASONING_LEVELS = new Set(['minimal', 'low', 'medium', 'high', 'xhigh']);
 
 /**
  * Smart profile detection
@@ -122,7 +126,19 @@ function resolveRuntimeReasoningFlags(
   return {
     argsWithoutReasoningFlags: runtime.argsWithoutReasoningFlags,
     reasoningOverride: runtime.reasoningOverride,
+    reasoningSource: runtime.sourceFlag
+      ? 'flag'
+      : runtime.reasoningOverride !== undefined
+        ? 'env'
+        : undefined,
+    sourceDisplay: runtime.sourceDisplay,
   };
+}
+
+function normalizeCodexRuntimeReasoningOverride(
+  value: string | number | undefined
+): string | undefined {
+  return typeof value === 'string' && CODEX_RUNTIME_REASONING_LEVELS.has(value) ? value : undefined;
 }
 
 function exitWithRuntimeReasoningFlagError(
@@ -417,6 +433,9 @@ async function main(): Promise<void> {
 
     // Resolve non-claude target adapter once.
     const targetAdapter = resolvedTarget !== 'claude' ? getTarget(resolvedTarget) : null;
+    let resolvedSettingsPath: string | undefined;
+    let resolvedSettings: ReturnType<typeof loadSettings> | undefined;
+    let resolvedCliproxyBridge: ReturnType<typeof resolveCliproxyBridgeMetadata> | undefined;
 
     // Preflight unsupported profile/target combinations BEFORE binary detection,
     // so users get the most actionable error even when the target CLI is not installed.
@@ -426,7 +445,29 @@ async function main(): Promise<void> {
         process.exit(1);
       }
 
-      if (profileInfo.type !== 'settings') {
+      if (profileInfo.type === 'settings') {
+        resolvedSettingsPath = profileInfo.settingsPath
+          ? expandPath(profileInfo.settingsPath)
+          : getSettingsPath(profileInfo.name);
+        resolvedSettings = loadSettings(resolvedSettingsPath);
+        resolvedCliproxyBridge = resolveCliproxyBridgeMetadata(resolvedSettings);
+        const compatibility = evaluateTargetRuntimeCompatibility({
+          target: resolvedTarget,
+          profileType: profileInfo.type,
+          cliproxyBridgeProvider: resolvedCliproxyBridge?.provider ?? null,
+        });
+        if (!compatibility.supported) {
+          console.error(
+            fail(
+              compatibility.reason || `${targetAdapter.displayName} does not support this profile.`
+            )
+          );
+          if (compatibility.suggestion) {
+            console.error(info(compatibility.suggestion));
+          }
+          process.exit(1);
+        }
+      } else {
         const compatibility = evaluateTargetRuntimeCompatibility({
           target: resolvedTarget,
           profileType: profileInfo.type,
@@ -524,7 +565,7 @@ async function main(): Promise<void> {
       } catch (error) {
         if (error instanceof DroidReasoningFlagError || error instanceof DroidCommandRouterError) {
           exitWithRuntimeReasoningFlagError(error.message, {
-            codexAliasLevels: 'medium|high|xhigh',
+            codexAliasLevels: 'minimal|low|medium|high|xhigh',
             includeDroidExecExample: true,
           });
         }
@@ -534,7 +575,20 @@ async function main(): Promise<void> {
       try {
         const runtime = resolveRuntimeReasoningFlags(remainingArgs, process.env.CCS_THINKING);
         targetRemainingArgs = runtime.argsWithoutReasoningFlags;
-        runtimeReasoningOverride = runtime.reasoningOverride;
+        const normalizedReasoning = normalizeCodexRuntimeReasoningOverride(
+          runtime.reasoningOverride
+        );
+        if (runtime.reasoningOverride !== undefined && !normalizedReasoning) {
+          if (runtime.reasoningSource === 'flag') {
+            throw new DroidReasoningFlagError(
+              'Codex target supports reasoning levels only: minimal, low, medium, high, xhigh.',
+              '--effort'
+            );
+          }
+          runtimeReasoningOverride = undefined;
+        } else {
+          runtimeReasoningOverride = normalizedReasoning;
+        }
       } catch (error) {
         if (error instanceof DroidReasoningFlagError) {
           exitWithRuntimeReasoningFlagError(error.message, {
@@ -777,11 +831,13 @@ async function main(): Promise<void> {
         );
       }
       const inheritedClaudeConfigDir = continuityInheritance.claudeConfigDir;
-      const expandedSettingsPath = profileInfo.settingsPath
-        ? expandPath(profileInfo.settingsPath)
-        : getSettingsPath(profileInfo.name);
-      const settings = loadSettings(expandedSettingsPath);
-      const cliproxyBridge = resolveCliproxyBridgeMetadata(settings);
+      const expandedSettingsPath =
+        resolvedSettingsPath ??
+        (profileInfo.settingsPath
+          ? expandPath(profileInfo.settingsPath)
+          : getSettingsPath(profileInfo.name));
+      const settings = resolvedSettings ?? loadSettings(expandedSettingsPath);
+      const cliproxyBridge = resolvedCliproxyBridge ?? resolveCliproxyBridgeMetadata(settings);
       if (resolvedTarget !== 'claude') {
         const compatibility = evaluateTargetRuntimeCompatibility({
           target: resolvedTarget,

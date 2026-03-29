@@ -85,18 +85,18 @@ CCS resolves which adapter to use via priority-ordered checks:
    └─ ccs --target droid glm
    └─ ccs --target codex
 
-2. Per-profile config (from ~/.ccs/config.yaml or settings.json)
-   └─ persisted targets are currently only `claude` and `droid`
-   └─ profiles:
-        glm:
-          target: droid
-
-3. argv[0] detection (runtime alias pattern) — binary name mapping
+2. argv[0] detection (runtime alias pattern) — binary name mapping
    └─ ccs-droid (explicit alias) → droid
    └─ ccsd (legacy shortcut) → droid
    └─ ccs-codex (explicit alias) → codex
    └─ ccsx (short alias) → codex
    └─ ccs (regular command) → default
+
+3. Per-profile config (from ~/.ccs/config.yaml or settings.json)
+   └─ persisted targets are currently only `claude` and `droid`
+   └─ profiles:
+        glm:
+          target: droid
 
 4. Fallback: 'claude' — lowest priority
 ```
@@ -117,16 +117,16 @@ export function resolveTargetType(
     return parsed.targetOverride;
   }
 
-  // 2. Check profile config
-  if (profileConfig?.target) {
-    // Persisted targets intentionally exclude runtime-only codex.
-    return profileConfig.target;
-  }
-
-  // 3. Check argv[0] (binary name)
+  // 2. Check argv[0] (binary name)
   const binName = path.basename(process.argv[1] || process.argv0 || '').replace(/\.(cmd|bat|ps1|exe)$/i, '');
   if (ARGV0_TARGET_MAP[binName]) {
     return ARGV0_TARGET_MAP[binName];
+  }
+
+  // 3. Check profile config
+  if (profileConfig?.target) {
+    // Persisted targets intentionally exclude runtime-only codex.
+    return profileConfig.target;
   }
 
   // 4. Default to claude

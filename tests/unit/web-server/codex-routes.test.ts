@@ -76,12 +76,14 @@ describe('codex routes', () => {
       rawText: string;
       config: Record<string, unknown> | null;
       parseError: string | null;
+      readError: string | null;
     };
 
     expect(json.success).toBe(true);
     expect(json.exists).toBe(true);
     expect(json.mtime).toBeGreaterThan(0);
     expect(json.parseError).toBeNull();
+    expect(json.readError).toBeNull();
     expect(json.rawText).toContain('model = "gpt-5.4"');
     expect(json.rawText).toContain('sandbox_mode = "workspace-write"');
     expect(json.config?.model).toBe('gpt-5.4');
@@ -110,6 +112,32 @@ describe('codex routes', () => {
     const json = (await res.json()) as { error: string; mtime: number };
     expect(json.error).toContain('File modified externally.');
     expect(json.mtime).toBeGreaterThan(0);
+  });
+
+  it('allows PATCH /config/patch on an existing config.toml without expectedMtime', async () => {
+    fs.writeFileSync(path.join(codexHome, 'config.toml'), 'model = "gpt-5.4"\n');
+
+    const res = await fetch(`${baseUrl}/api/codex/config/patch`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'feature',
+        feature: 'multi_agent',
+        enabled: true,
+      }),
+    });
+
+    expect(res.status).toBe(200);
+
+    const json = (await res.json()) as {
+      success: boolean;
+      rawText: string;
+      config: Record<string, unknown> | null;
+    };
+
+    expect(json.success).toBe(true);
+    expect(json.rawText).toContain('multi_agent = true');
+    expect(json.config?.features).toEqual({ multi_agent: true });
   });
 
   it('returns 400 when PATCH /config/patch omits kind', async () => {

@@ -70,8 +70,8 @@ const MODEL_REASONING_EFFORT_VALUES = new Set(['minimal', 'low', 'medium', 'high
 const APPROVAL_POLICY_VALUES = new Set(['on-request', 'never', 'untrusted']);
 const SANDBOX_MODE_VALUES = new Set(['read-only', 'workspace-write', 'danger-full-access']);
 const WEB_SEARCH_VALUES = new Set(['cached', 'live', 'disabled']);
-const PERSONALITY_VALUES = new Set(['default', 'pragmatic', 'concise', 'direct']);
-const PROJECT_TRUST_LEVEL_VALUES = new Set(['trusted', 'ask']);
+const PERSONALITY_VALUES = new Set(['none', 'friendly', 'pragmatic']);
+const PROJECT_TRUST_LEVEL_VALUES = new Set(['trusted', 'untrusted']);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -113,9 +113,20 @@ function deleteIfEmpty(target: Record<string, unknown>, key: string) {
   }
 }
 
+function shouldPreserveUnsupportedValue(value: unknown): boolean {
+  return Array.isArray(value) || isObject(value);
+}
+
+function deleteFieldUnlessUnsupported(target: Record<string, unknown>, key: string) {
+  if (shouldPreserveUnsupportedValue(target[key])) {
+    return;
+  }
+  delete target[key];
+}
+
 function setStringField(target: Record<string, unknown>, key: string, value: unknown) {
   if (!isNonEmptyString(value)) {
-    delete target[key];
+    deleteFieldUnlessUnsupported(target, key);
     return;
   }
   target[key] = value.trim();
@@ -129,7 +140,7 @@ function setEnumStringField(
   label: string
 ) {
   if (!isNonEmptyString(value)) {
-    delete target[key];
+    deleteFieldUnlessUnsupported(target, key);
     return;
   }
 
@@ -145,7 +156,7 @@ function setEnumStringField(
 
 function setBooleanField(target: Record<string, unknown>, key: string, value: unknown) {
   if (typeof value !== 'boolean') {
-    delete target[key];
+    deleteFieldUnlessUnsupported(target, key);
     return;
   }
   target[key] = value;
@@ -158,7 +169,7 @@ function setNumberField(
   options: { integer?: boolean; min?: number } = {}
 ) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    delete target[key];
+    deleteFieldUnlessUnsupported(target, key);
     return;
   }
 
@@ -197,6 +208,24 @@ function assertPatchableToml(fileProbe: {
     );
   }
   return asObject(fileProbe.config) ?? {};
+}
+
+function summarizeApprovalPolicy(value: unknown): string | null {
+  const stringValue = asString(value);
+  if (stringValue) {
+    return stringValue;
+  }
+
+  const objectValue = asObject(value);
+  if (!objectValue) {
+    return null;
+  }
+
+  if (hasOwn(objectValue, 'granular')) {
+    return 'granular (custom)';
+  }
+
+  return 'custom object';
 }
 
 function applyTopLevelSettingsPatch(
@@ -460,16 +489,11 @@ function applyMcpServerPatch(
   if (hasOwn(values, 'enabled')) setBooleanField(nextServer, 'enabled', values.enabled);
   if (hasOwn(values, 'required')) setBooleanField(nextServer, 'required', values.required);
   if (hasOwn(values, 'startupTimeoutSec')) {
-    setNumberField(nextServer, 'startup_timeout_sec', values.startupTimeoutSec, {
-      integer: true,
-      min: 1,
-    });
+    delete nextServer.startup_timeout_ms;
+    setNumberField(nextServer, 'startup_timeout_sec', values.startupTimeoutSec, { min: 1 });
   }
   if (hasOwn(values, 'toolTimeoutSec')) {
-    setNumberField(nextServer, 'tool_timeout_sec', values.toolTimeoutSec, {
-      integer: true,
-      min: 1,
-    });
+    setNumberField(nextServer, 'tool_timeout_sec', values.toolTimeoutSec, { min: 1 });
   }
   if (hasOwn(values, 'enabledTools')) {
     const nextEnabledTools = normalizeStringArray(values.enabledTools, 'enabledTools');
@@ -506,7 +530,9 @@ export function resolveCodexConfigPaths(
 ): CodexConfigPaths {
   const env = options.env ?? process.env;
   const homeDir = options.homeDir ?? os.homedir();
-  const baseDir = env.CODEX_HOME ? expandPath(env.CODEX_HOME) : path.join(homeDir, '.codex');
+  const baseDir = path.resolve(
+    env.CODEX_HOME ? expandPath(env.CODEX_HOME) : path.join(homeDir, '.codex')
+  );
   const baseDirDisplay = env.CODEX_HOME ? '$CODEX_HOME' : '~/.codex';
 
   return {
@@ -596,7 +622,8 @@ export function summarizeCodexMcpServers(value: unknown): CodexMcpServerDiagnost
 
       const startupTimeoutMs = asNumber(server.startup_timeout_ms);
       const startupTimeoutSec =
-        asNumber(server.startup_timeout_sec) ?? (startupTimeoutMs ? startupTimeoutMs / 1000 : null);
+        asNumber(server.startup_timeout_sec) ??
+        (startupTimeoutMs !== null ? startupTimeoutMs / 1000 : null);
 
       return {
         name,
@@ -727,7 +754,7 @@ export async function getCodexDashboardDiagnostics(): Promise<CodexDashboardDiag
       modelReasoningEffort: asString(config?.model_reasoning_effort),
       modelProvider: asString(config?.model_provider),
       activeProfile,
-      approvalPolicy: asString(config?.approval_policy),
+      approvalPolicy: summarizeApprovalPolicy(config?.approval_policy),
       sandboxMode: asString(config?.sandbox_mode),
       webSearch: asString(config?.web_search),
       toolOutputTokenLimit: asNumber(config?.tool_output_token_limit),
@@ -768,6 +795,7 @@ export async function getCodexRawConfig(): Promise<CodexRawConfigResponse> {
     rawText: fileProbe.rawText,
     config: fileProbe.config,
     parseError: fileProbe.diagnostics.parseError,
+    readError: fileProbe.diagnostics.readError,
   };
 }
 
@@ -827,7 +855,7 @@ export async function patchCodexConfig(
   const saved = await writeTomlFileAtomic({
     filePath: paths.configPath,
     rawText,
-    expectedMtime: input.expectedMtime,
+    expectedMtime: input.expectedMtime ?? fileProbe.diagnostics.mtimeMs ?? undefined,
     fileLabel: 'config.toml',
   });
 
@@ -840,5 +868,6 @@ export async function patchCodexConfig(
     rawText,
     config: nextConfig,
     parseError: null,
+    readError: null,
   };
 }

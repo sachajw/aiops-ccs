@@ -58,7 +58,7 @@ CCS v7.45 introduces the Target Adapter pattern, enabling seamless integration w
 Profile Resolution (CLIProxy, Settings/API, Account-based)
         |
         v
-Target Resolution (--target flag > config > argv[0] > default)
+Target Resolution (--target flag > argv[0] > config > default)
         |
         v
 Get Target Adapter (Claude, Droid, or Codex)

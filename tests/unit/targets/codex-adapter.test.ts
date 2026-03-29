@@ -30,9 +30,34 @@ describe('CodexAdapter', () => {
         apiKey: '',
         reasoningOverride: 'medium',
       },
+      binaryInfo: {
+        path: '/tmp/codex',
+        needsShell: false,
+        features: ['config-overrides'],
+      },
     });
 
     expect(args).toEqual(['-c', 'model_reasoning_effort="medium"', '--search']);
+  });
+
+  test('rejects default-mode reasoning overrides when codex lacks config override support', () => {
+    expect(() =>
+      adapter.buildArgs('default', ['--search'], {
+        profileType: 'default',
+        creds: {
+          profile: 'default',
+          baseUrl: '',
+          apiKey: '',
+          reasoningOverride: 'high',
+        },
+        binaryInfo: {
+          path: '/tmp/codex',
+          needsShell: false,
+          version: 'codex-cli 0.1.0',
+          features: [],
+        },
+      })
+    ).toThrow(/does not advertise --config overrides/);
   });
 
   test('injects transient config overrides for CCS-backed launches', () => {
@@ -95,6 +120,29 @@ describe('CodexAdapter', () => {
         },
       })
     ).toThrow(/does not allow --profile\/-p/);
+  });
+
+  test('rejects user-supplied --config overrides for CCS-backed launches', () => {
+    const options = {
+      profileType: 'cliproxy' as const,
+      creds: {
+        profile: 'codex',
+        baseUrl: 'http://127.0.0.1:8317/api/provider/codex',
+        apiKey: 'cliproxy-token',
+      },
+      binaryInfo: {
+        path: '/tmp/codex',
+        needsShell: false,
+        features: ['config-overrides'],
+      },
+    };
+
+    expect(() => adapter.buildArgs('codex', ['-c', 'model="other"', '--search'], options)).toThrow(
+      /does not allow --config\/-c/
+    );
+    expect(() =>
+      adapter.buildArgs('codex', ['--config=model="other"', '--search'], options)
+    ).toThrow(/does not allow --config\/-c/);
   });
 
   test('rejects unsupported reasoning override values for CCS-backed launches', () => {

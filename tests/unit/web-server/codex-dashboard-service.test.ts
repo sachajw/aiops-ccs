@@ -62,14 +62,14 @@ describe('codex-dashboard-service', () => {
   it('resolves codex config paths with CODEX_HOME override', () => {
     const resolved = resolveCodexConfigPaths({
       env: {
-        CODEX_HOME: '/tmp/custom-codex-home',
+        CODEX_HOME: './custom-codex-home',
       } as NodeJS.ProcessEnv,
       homeDir: '/Users/tester',
     });
 
-    expect(resolved.baseDir).toBe('/tmp/custom-codex-home');
+    expect(resolved.baseDir).toBe(path.resolve('./custom-codex-home'));
     expect(resolved.baseDirDisplay).toBe('$CODEX_HOME');
-    expect(resolved.configPath).toBe('/tmp/custom-codex-home/config.toml');
+    expect(resolved.configPath).toBe(path.join(path.resolve('./custom-codex-home'), 'config.toml'));
     expect(resolved.configDisplayPath).toBe('$CODEX_HOME/config.toml');
   });
 
@@ -103,7 +103,7 @@ describe('codex-dashboard-service', () => {
     });
     const projects = summarizeCodexProjectTrust({
       '/tmp/a': { trust_level: 'trusted' },
-      '/tmp/b': { trust_level: 'ask' },
+      '/tmp/b': { trust_level: 'untrusted' },
     });
     const servers = summarizeCodexMcpServers({
       stdio: {
@@ -133,6 +133,7 @@ describe('codex-dashboard-service', () => {
     expect(raw.path).toBe('$CODEX_HOME/config.toml');
     expect(raw.rawText).toBe('');
     expect(raw.config).toBeNull();
+    expect(raw.readError).toBeNull();
   });
 
   it('returns parseError when config.toml is invalid TOML', async () => {
@@ -142,6 +143,19 @@ describe('codex-dashboard-service', () => {
 
     expect(raw.exists).toBe(true);
     expect(raw.parseError).toBeString();
+    expect(raw.config).toBeNull();
+  });
+
+  it('returns readError when config.toml is a symlink', async () => {
+    const configPath = path.join(codexHome, 'config.toml');
+    const targetPath = path.join(testRoot, 'linked.toml');
+    fs.writeFileSync(targetPath, 'model = "gpt-5.4"\n');
+    fs.symlinkSync(targetPath, configPath);
+
+    const raw = await getCodexRawConfig();
+
+    expect(raw.exists).toBe(true);
+    expect(raw.readError).toContain('Refusing symlink file');
     expect(raw.config).toBeNull();
   });
 
@@ -170,7 +184,7 @@ wire_api = "responses"
 trust_level = "trusted"
 
 [projects."/tmp/project-b"]
-trust_level = "ask"
+trust_level = "untrusted"
 
 [mcp_servers.playwright]
 command = "npx"
@@ -202,6 +216,17 @@ model = "gpt-5.4"
     expect(diagnostics.config.mcpServerCount).toBe(1);
     expect(diagnostics.docsReference.links.length).toBeGreaterThan(0);
     expect(diagnostics.supportMatrix.some((entry) => entry.id === 'default')).toBe(true);
+  });
+
+  it('summarizes granular approval policies without flattening them to null', async () => {
+    fs.writeFileSync(
+      path.join(codexHome, 'config.toml'),
+      'approval_policy = { granular = { edit = "on-request" } }\n'
+    );
+
+    const diagnostics = await getCodexDashboardDiagnostics();
+
+    expect(diagnostics.config.approvalPolicy).toBe('granular (custom)');
   });
 
   it('warns when active profile is missing, config overrides are unavailable, or risky fields exist', async () => {
@@ -289,7 +314,7 @@ bearer_token = "secret"
         sandboxMode: 'workspace-write',
         webSearch: 'cached',
         toolOutputTokenLimit: 12000,
-        personality: 'pragmatic',
+        personality: 'friendly',
       },
     });
 
@@ -304,10 +329,49 @@ bearer_token = "secret"
     expect(diagnostics.config.model).toBe('gpt-5.4');
     expect(diagnostics.config.modelReasoningEffort).toBe('high');
     expect(diagnostics.config.toolOutputTokenLimit).toBe(12000);
-    expect(diagnostics.config.personality).toBe('pragmatic');
+    expect(diagnostics.config.personality).toBe('friendly');
     expect(diagnostics.config.projectTrust[0]?.path).toBe('/tmp/workspace-a');
     expect(result.rawText).toContain('model = "gpt-5.4"');
     expect(result.config?.model).toBe('gpt-5.4');
+  });
+
+  it('allows structured patches on existing config.toml even when expectedMtime is omitted', async () => {
+    fs.writeFileSync(path.join(codexHome, 'config.toml'), 'model = "gpt-5.4"\n');
+
+    const result = await patchCodexConfig({
+      kind: 'feature',
+      feature: 'multi_agent',
+      enabled: true,
+    });
+
+    expect(result.rawText).toContain('model = "gpt-5.4"');
+    expect(result.rawText).toContain('[features]');
+    expect(result.rawText).toContain('multi_agent = true');
+    expect(result.config?.features).toEqual({ multi_agent: true });
+  });
+
+  it('preserves unsupported approval_policy objects when structured saves touch other fields', async () => {
+    fs.writeFileSync(
+      path.join(codexHome, 'config.toml'),
+      'model = "gpt-5.4"\napproval_policy = { granular = { edit = "on-request" } }\n'
+    );
+
+    const current = await getCodexRawConfig();
+    const result = await patchCodexConfig({
+      kind: 'top-level',
+      expectedMtime: current.mtime,
+      values: {
+        model: 'gpt-5.4-mini',
+        approvalPolicy: null,
+      },
+    });
+
+    expect(result.rawText).toContain('model = "gpt-5.4-mini"');
+    expect(result.rawText).toContain('[approval_policy.granular]');
+    expect(result.rawText).toContain('edit = "on-request"');
+    expect(result.config?.approval_policy).toEqual({
+      granular: { edit: 'on-request' },
+    });
   });
 
   it('expands home paths for project trust and rejects relative paths', async () => {
@@ -382,6 +446,46 @@ bearer_token = "secret"
     expect(raw.rawText).toContain('[mcp_servers.playwright]');
     expect(profileResult.rawText).toContain('[profiles.deep-review]');
     expect(profileResult.config?.profile).toBe('deep-review');
+  });
+
+  it('accepts non-integer MCP timeout values documented by upstream Codex', async () => {
+    const result = await patchCodexConfig({
+      kind: 'mcp-server',
+      action: 'upsert',
+      name: 'streaming',
+      values: {
+        transport: 'stdio',
+        command: 'npx',
+        startupTimeoutSec: 1.5,
+        toolTimeoutSec: 2.25,
+      },
+    });
+
+    expect(result.rawText).toContain('startup_timeout_sec = 1.5');
+    expect(result.rawText).toContain('tool_timeout_sec = 2.25');
+  });
+
+  it('rewrites legacy startup_timeout_ms keys when editing MCP server timeouts', async () => {
+    fs.writeFileSync(
+      path.join(codexHome, 'config.toml'),
+      ['[mcp_servers.streaming]', 'command = "npx"', 'startup_timeout_ms = 1500', ''].join('\n')
+    );
+    const raw = await getCodexRawConfig();
+
+    const result = await patchCodexConfig({
+      kind: 'mcp-server',
+      action: 'upsert',
+      name: 'streaming',
+      expectedMtime: raw.mtime,
+      values: {
+        transport: 'stdio',
+        command: 'npx',
+        startupTimeoutSec: 2.5,
+      },
+    });
+
+    expect(result.rawText).toContain('startup_timeout_sec = 2.5');
+    expect(result.rawText).not.toContain('startup_timeout_ms');
   });
 
   it('patches streamable-http mcp servers through structured controls', async () => {
