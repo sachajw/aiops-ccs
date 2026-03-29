@@ -36,8 +36,9 @@ export const CCS_CONTROL_PANEL_SECRET = 'ccs';
  * v12: Removed denylisted Antigravity Claude 4.5 aliases
  * v13: Removed aggressive Gemini alias expansion to reduce model list noise in Control Panel
  * v14: Added Gemini 3.1 Flash Antigravity aliases for upcoming rollout compatibility
+ * v15: Prune stale generated Antigravity Gemini preview aliases during regeneration
  */
-export const CLIPROXY_CONFIG_VERSION = 14;
+export const CLIPROXY_CONFIG_VERSION = 15;
 
 interface OAuthModelAliasEntry {
   name: string;
@@ -68,6 +69,12 @@ const DEFAULT_ANTIGRAVITY_ALIASES: OAuthModelAliasEntry[] = [
   { name: 'claude-sonnet-4-6-thinking', alias: 'claude-sonnet-4-6', fork: true },
   { name: 'claude-opus-4-6-thinking', alias: 'claude-opus-4-6-thinking', fork: true },
 ];
+
+const BUILT_IN_GEMINI_ALIAS_NAMES = new Set(
+  DEFAULT_ANTIGRAVITY_ALIASES.filter((entry) => entry.alias.startsWith('gemini-3')).map(
+    (entry) => entry.name
+  )
+);
 
 /**
  * Get provider configuration
@@ -146,6 +153,10 @@ function addAliasEntry(
 
   indexByKey.set(key, entries.length);
   entries.push(normalized);
+}
+
+function buildAntigravityAliasKey(entry: Pick<OAuthModelAliasEntry, 'name' | 'alias'>): string {
+  return `${sanitizeYamlScalar(entry.name)}\u0000${normalizeAntigravityAlias(entry.alias)}`;
 }
 
 function parseExistingAntigravityAliases(existingAliases: string): OAuthModelAliasEntry[] {
@@ -265,6 +276,113 @@ function getCompatibilityAliases(entries: OAuthModelAliasEntry[]): OAuthModelAli
     }
   }
   return compatibilityAliases;
+}
+
+function buildGeneratedAntigravityAliases(): OAuthModelAliasEntry[] {
+  const generatedAliases: OAuthModelAliasEntry[] = [];
+  const generatedAliasIndex = new Map<string, number>();
+
+  for (const alias of DEFAULT_ANTIGRAVITY_ALIASES) {
+    addAliasEntry(generatedAliases, generatedAliasIndex, alias);
+  }
+
+  for (const alias of getCompatibilityAliases(generatedAliases)) {
+    addAliasEntry(generatedAliases, generatedAliasIndex, alias);
+  }
+
+  return generatedAliases;
+}
+
+const GENERATED_ANTIGRAVITY_ALIASES = buildGeneratedAntigravityAliases();
+const GENERATED_ANTIGRAVITY_ALIAS_MAP = new Map(
+  GENERATED_ANTIGRAVITY_ALIASES.map((entry) => [buildAntigravityAliasKey(entry), entry] as const)
+);
+
+function serializeAntigravityAliases(entries: OAuthModelAliasEntry[]): string {
+  if (entries.length === 0) {
+    return '';
+  }
+
+  const lines = ['  antigravity:'];
+  for (const entry of entries) {
+    lines.push(`    - name: ${entry.name}`);
+    lines.push(`      alias: ${entry.alias}`);
+    if (entry.fork) {
+      lines.push('      fork: true');
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function getLegacyGeneratedGeminiPreviewClusterKey(entry: OAuthModelAliasEntry): string | null {
+  if (!BUILT_IN_GEMINI_ALIAS_NAMES.has(entry.name)) {
+    return null;
+  }
+
+  const normalizedAlias = normalizeAntigravityAlias(entry.alias).toLowerCase();
+  if (!normalizedAlias.startsWith('gemini-3') || !normalizedAlias.includes('-preview')) {
+    return null;
+  }
+
+  const aliasWithoutCustomtools = normalizedAlias.endsWith('-customtools')
+    ? normalizedAlias.slice(0, -'-customtools'.length)
+    : normalizedAlias;
+  const clusterAlias =
+    toDottedGeminiVersionAlias(aliasWithoutCustomtools) ?? aliasWithoutCustomtools;
+
+  return `${sanitizeYamlScalar(entry.name)}\u0000${clusterAlias}`;
+}
+
+function extractPreservedAntigravityAliases(existingAliases: string): string {
+  if (!existingAliases.trim()) {
+    return '';
+  }
+
+  const parsedEntries = parseExistingAntigravityAliases(existingAliases);
+  const legacyGeneratedGeminiClusterCounts = new Map<string, number>();
+
+  for (const entry of parsedEntries) {
+    if (entry.fork) {
+      continue;
+    }
+
+    const generatedEntry = GENERATED_ANTIGRAVITY_ALIAS_MAP.get(buildAntigravityAliasKey(entry));
+    if (generatedEntry) {
+      continue;
+    }
+
+    const clusterKey = getLegacyGeneratedGeminiPreviewClusterKey(entry);
+    if (!clusterKey) {
+      continue;
+    }
+
+    legacyGeneratedGeminiClusterCounts.set(
+      clusterKey,
+      (legacyGeneratedGeminiClusterCounts.get(clusterKey) ?? 0) + 1
+    );
+  }
+
+  const preservedEntries = parsedEntries.filter((entry) => {
+    const generatedEntry = GENERATED_ANTIGRAVITY_ALIAS_MAP.get(buildAntigravityAliasKey(entry));
+
+    if (generatedEntry) {
+      return Boolean(entry.fork) && !generatedEntry.fork;
+    }
+
+    if (entry.fork) {
+      return true;
+    }
+
+    const clusterKey = getLegacyGeneratedGeminiPreviewClusterKey(entry);
+    if (!clusterKey) {
+      return true;
+    }
+
+    return (legacyGeneratedGeminiClusterCounts.get(clusterKey) ?? 0) < 3;
+  });
+
+  return serializeAntigravityAliases(preservedEntries);
 }
 
 /**
@@ -543,8 +661,10 @@ export function regenerateConfig(port: number = CLIPROXY_DEFAULT_PORT): string {
       // Preserve claude-api-key section (managed via dashboard/API)
       claudeApiKeySection = extractYamlSection(content, 'claude-api-key');
 
-      // Preserve existing oauth-model-alias user customizations
-      existingAliases = extractYamlSection(content, 'oauth-model-alias');
+      // Preserve user customizations while pruning legacy generated Gemini preview noise.
+      existingAliases = extractPreservedAntigravityAliases(
+        extractYamlSection(content, 'oauth-model-alias')
+      );
     } catch {
       // Use defaults if reading fails
     }
