@@ -165,24 +165,74 @@ describe('CodexAdapter', () => {
   });
 
   test('injects CCS_CODEX_API_KEY for CCS-backed launches only', () => {
-    const settingsEnv = adapter.buildEnv(
-      {
-        profile: 'codex',
-        baseUrl: 'http://127.0.0.1:8317/api/provider/codex',
-        apiKey: 'cliproxy-token',
-      },
-      'cliproxy'
-    );
-    expect(settingsEnv.CCS_CODEX_API_KEY).toBe('cliproxy-token');
+    const originalCodeXHome = process.env.CODEX_HOME;
+    const originalCodeXCi = process.env.CODEX_CI;
+    const originalCodeXManagedByBun = process.env.CODEX_MANAGED_BY_BUN;
+    const originalCodeXThreadId = process.env.CODEX_THREAD_ID;
+    const originalAnthropicBaseUrl = process.env.ANTHROPIC_BASE_URL;
 
-    const defaultEnv = adapter.buildEnv(
-      {
-        profile: 'default',
-        baseUrl: '',
-        apiKey: '',
-      },
-      'default'
-    );
-    expect(defaultEnv.CCS_CODEX_API_KEY).toBeUndefined();
+    try {
+      process.env.CODEX_HOME = '/tmp/codex-home';
+      process.env.CODEX_CI = '1';
+      process.env.CODEX_MANAGED_BY_BUN = '1';
+      process.env.CODEX_THREAD_ID = 'thread-123';
+      process.env.ANTHROPIC_BASE_URL = 'https://stale-proxy.invalid';
+
+      const settingsEnv = adapter.buildEnv(
+        {
+          profile: 'codex',
+          baseUrl: 'http://127.0.0.1:8317/api/provider/codex',
+          apiKey: 'cliproxy-token',
+        },
+        'cliproxy'
+      );
+      expect(settingsEnv.CCS_CODEX_API_KEY).toBe('cliproxy-token');
+      expect(settingsEnv.CODEX_HOME).toBe('/tmp/codex-home');
+      expect(settingsEnv.CODEX_CI).toBeUndefined();
+      expect(settingsEnv.CODEX_MANAGED_BY_BUN).toBeUndefined();
+      expect(settingsEnv.CODEX_THREAD_ID).toBeUndefined();
+      expect(settingsEnv.ANTHROPIC_BASE_URL).toBeUndefined();
+
+      const defaultEnv = adapter.buildEnv(
+        {
+          profile: 'default',
+          baseUrl: '',
+          apiKey: '',
+        },
+        'default'
+      );
+      expect(defaultEnv.CCS_CODEX_API_KEY).toBeUndefined();
+      expect(defaultEnv.CODEX_HOME).toBe('/tmp/codex-home');
+      expect(defaultEnv.CODEX_CI).toBeUndefined();
+      expect(defaultEnv.CODEX_MANAGED_BY_BUN).toBeUndefined();
+      expect(defaultEnv.CODEX_THREAD_ID).toBeUndefined();
+      expect(defaultEnv.ANTHROPIC_BASE_URL).toBeUndefined();
+    } finally {
+      if (originalCodeXHome === undefined) {
+        delete process.env.CODEX_HOME;
+      } else {
+        process.env.CODEX_HOME = originalCodeXHome;
+      }
+      if (originalCodeXCi === undefined) {
+        delete process.env.CODEX_CI;
+      } else {
+        process.env.CODEX_CI = originalCodeXCi;
+      }
+      if (originalCodeXManagedByBun === undefined) {
+        delete process.env.CODEX_MANAGED_BY_BUN;
+      } else {
+        process.env.CODEX_MANAGED_BY_BUN = originalCodeXManagedByBun;
+      }
+      if (originalCodeXThreadId === undefined) {
+        delete process.env.CODEX_THREAD_ID;
+      } else {
+        process.env.CODEX_THREAD_ID = originalCodeXThreadId;
+      }
+      if (originalAnthropicBaseUrl === undefined) {
+        delete process.env.ANTHROPIC_BASE_URL;
+      } else {
+        process.env.ANTHROPIC_BASE_URL = originalAnthropicBaseUrl;
+      }
+    }
   });
 });

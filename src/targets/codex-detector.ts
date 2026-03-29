@@ -45,7 +45,7 @@ function runCodexProbe(codexPath: string, args: string[]): string | undefined {
   }
 }
 
-function readCodexVersion(codexPath: string): string | undefined {
+export function readCodexVersion(codexPath: string): string | undefined {
   return runCodexProbe(codexPath, ['--version'])?.trim();
 }
 
@@ -118,7 +118,10 @@ export function detectCodexCli(): string | null {
   return null;
 }
 
-export function getCodexBinaryInfo(): TargetBinaryInfo | null {
+export function getCodexBinaryInfo(options?: {
+  includeVersion?: boolean;
+  includeFeatures?: boolean;
+}): TargetBinaryInfo | null {
   const codexPath = detectCodexCli();
   if (!codexPath) return null;
 
@@ -126,13 +129,21 @@ export function getCodexBinaryInfo(): TargetBinaryInfo | null {
   return {
     path: codexPath,
     needsShell: isWindows && /\.(cmd|bat|ps1)$/i.test(codexPath),
-    version: readCodexVersion(codexPath),
-    features: detectCodexFeatures(codexPath),
+    version: options?.includeVersion === false ? undefined : readCodexVersion(codexPath),
+    features: options?.includeFeatures === false ? undefined : detectCodexFeatures(codexPath),
   };
 }
 
 export function codexBinarySupportsConfigOverrides(
   binaryInfo: TargetBinaryInfo | null | undefined
 ): boolean {
-  return Boolean(binaryInfo?.features?.includes(CODEX_CONFIG_OVERRIDE_FEATURE));
+  if (!binaryInfo) {
+    return false;
+  }
+
+  if (binaryInfo.features) {
+    return binaryInfo.features.includes(CODEX_CONFIG_OVERRIDE_FEATURE);
+  }
+
+  return detectCodexFeatures(binaryInfo.path).includes(CODEX_CONFIG_OVERRIDE_FEATURE);
 }

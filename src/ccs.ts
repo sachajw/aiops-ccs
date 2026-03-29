@@ -95,6 +95,7 @@ interface RuntimeReasoningResolution {
 }
 
 const CODEX_RUNTIME_REASONING_LEVELS = new Set(['minimal', 'low', 'medium', 'high', 'xhigh']);
+const CODEX_NATIVE_PASSTHROUGH_FLAGS = new Set(['--help', '-h', '--version', '-v']);
 
 /**
  * Smart profile detection
@@ -239,6 +240,47 @@ function resolveNativeClaudeLaunchArgs(
   return buildOfficialChannelsArgs(args, plan.appliedChannels, plan.wantsPermissionBypass);
 }
 
+function shouldPassthroughNativeCodexFlagCommand(args: string[]): boolean {
+  const targetArgs = stripTargetFlag(args);
+  if (targetArgs.length === 0) {
+    return false;
+  }
+
+  return (
+    resolveTargetType(args) === 'codex' && CODEX_NATIVE_PASSTHROUGH_FLAGS.has(targetArgs[0] || '')
+  );
+}
+
+function execNativeCodexFlagCommand(args: string[]): void {
+  const adapter = getTarget('codex');
+  if (!adapter) {
+    console.error(fail('Target adapter not found for "codex"'));
+    process.exit(1);
+  }
+
+  const binaryInfo = adapter.detectBinary();
+  if (!binaryInfo) {
+    console.error(fail('Codex CLI not found.'));
+    console.error(info('Install a recent @openai/codex build, then retry.'));
+    process.exit(1);
+  }
+
+  const targetArgs = stripTargetFlag(args);
+  const creds: TargetCredentials = {
+    profile: 'default',
+    baseUrl: '',
+    apiKey: '',
+  };
+
+  const builtArgs = adapter.buildArgs('default', targetArgs, {
+    creds,
+    profileType: 'default',
+    binaryInfo,
+  });
+  const targetEnv = adapter.buildEnv(creds, 'default');
+  adapter.exec(builtArgs, targetEnv, { binaryInfo });
+}
+
 async function main(): Promise<void> {
   // Register target adapters
   registerTarget(new ClaudeAdapter());
@@ -313,6 +355,11 @@ async function main(): Promise<void> {
       console.error('    OAuth tokens in cliproxy/auth/ will be synced to cloud.');
       console.error('    Consider: CCS_DIR=/path/outside/cloud ccs ...');
     }
+  }
+
+  if (shouldPassthroughNativeCodexFlagCommand(args)) {
+    execNativeCodexFlagCommand(args);
+    return;
   }
 
   const firstArg = args[0];

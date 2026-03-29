@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import type { ProfileType } from '../types/profile';
 import { runCleanup } from '../errors';
 import { wireChildProcessSignals } from '../utils/signal-forwarder';
-import { escapeShellArg, stripAnthropicEnv } from '../utils/shell-executor';
+import { escapeShellArg, stripAnthropicEnv, stripCodexSessionEnv } from '../utils/shell-executor';
 import type {
   TargetAdapter,
   TargetBinaryInfo,
@@ -14,6 +14,7 @@ import {
   codexBinarySupportsConfigOverrides,
   detectCodexCli,
   getCodexBinaryInfo,
+  readCodexVersion,
 } from './codex-detector';
 
 const CODEX_RUNTIME_PROVIDER_ID = 'ccs_runtime';
@@ -33,6 +34,17 @@ function buildConfigOverrideSupportError(binaryInfo?: TargetBinaryInfo): Error {
   return new Error(
     `Codex CLI${versionSummary} does not advertise --config overrides. Upgrade Codex before using CCS-backed Codex profiles or runtime reasoning overrides.`
   );
+}
+
+function hydrateCodexBinaryVersion(binaryInfo?: TargetBinaryInfo): TargetBinaryInfo | undefined {
+  if (!binaryInfo || binaryInfo.version || !binaryInfo.path) {
+    return binaryInfo;
+  }
+
+  return {
+    ...binaryInfo,
+    version: readCodexVersion(binaryInfo.path),
+  };
 }
 
 function findDisallowedCodexManagedFlags(args: string[]): string[] {
@@ -76,7 +88,7 @@ export class CodexAdapter implements TargetAdapter {
   readonly displayName = 'Codex CLI';
 
   detectBinary(): TargetBinaryInfo | null {
-    return getCodexBinaryInfo();
+    return getCodexBinaryInfo({ includeVersion: false, includeFeatures: false });
   }
 
   async prepareCredentials(_creds: TargetCredentials): Promise<void> {
@@ -99,7 +111,7 @@ export class CodexAdapter implements TargetAdapter {
     if (profileType === 'default') {
       if (reasoningOverride) {
         if (!codexBinarySupportsConfigOverrides(options?.binaryInfo)) {
-          throw buildConfigOverrideSupportError(options?.binaryInfo);
+          throw buildConfigOverrideSupportError(hydrateCodexBinaryVersion(options?.binaryInfo));
         }
         return [
           ...buildConfigOverrideArgs([
@@ -112,7 +124,7 @@ export class CodexAdapter implements TargetAdapter {
     }
 
     if (!codexBinarySupportsConfigOverrides(options?.binaryInfo)) {
-      throw buildConfigOverrideSupportError(options?.binaryInfo);
+      throw buildConfigOverrideSupportError(hydrateCodexBinaryVersion(options?.binaryInfo));
     }
 
     if (!creds?.baseUrl?.trim() || !creds.apiKey?.trim()) {
@@ -148,7 +160,9 @@ export class CodexAdapter implements TargetAdapter {
   }
 
   buildEnv(creds: TargetCredentials, profileType: ProfileType): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = { ...stripAnthropicEnv(process.env) };
+    const env: NodeJS.ProcessEnv = {
+      ...stripCodexSessionEnv(stripAnthropicEnv(process.env)),
+    };
     delete env[CODEX_RUNTIME_ENV_KEY];
     if (profileType !== 'default') {
       if (!creds.apiKey?.trim()) {
