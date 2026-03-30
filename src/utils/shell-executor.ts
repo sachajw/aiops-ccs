@@ -43,6 +43,25 @@ export function stripClaudeCodeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 }
 
 /**
+ * Strip Codex session-scoped env vars before launching a nested Codex process.
+ *
+ * Keep real user config such as CODEX_HOME intact. Only remove the known
+ * session/runtime metadata exported by the current Codex host process.
+ */
+export function stripCodexSessionEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const sessionKeys = new Set(['CODEX_CI', 'CODEX_MANAGED_BY_BUN', 'CODEX_THREAD_ID']);
+  const result: NodeJS.ProcessEnv = {};
+  for (const key of Object.keys(env)) {
+    const upperKey = key.toUpperCase();
+    if (sessionKeys.has(upperKey)) {
+      continue;
+    }
+    result[key] = env[key];
+  }
+  return result;
+}
+
+/**
  * Resolve CCS-managed environment overrides for Claude launch.
  * - preferences.auto_update: false -> DISABLE_AUTOUPDATER=1
  */

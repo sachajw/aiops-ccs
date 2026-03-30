@@ -56,6 +56,61 @@ export const SUPPORT_SCOPE_LABELS: Record<SupportScope, string> = {
 
 export const SUPPORT_NOTICES: SupportNotice[] = [
   {
+    id: 'codex-target-runtime-support',
+    title: 'Native Codex runtime support is live',
+    summary:
+      'Codex now participates as a first-class runtime target through ccs-codex, ccsx, ccsxp, or --target codex.',
+    primaryAction:
+      'Use Codex as a runtime target for native Codex sessions and Codex-routed CLIProxy flows.',
+    publishedAt: '2026-03-28',
+    status: 'new',
+    scopes: ['target', 'cliproxy', 'api-profiles'],
+    entryIds: ['codex-target', 'codex-cliproxy'],
+    highlights: [
+      'Use ccs-codex or ccsx for native Codex runs.',
+      'Use ccsxp for the built-in CCS Codex provider shortcut on native Codex.',
+      'Built-in Codex and Codex bridge profiles can run on native Codex with --target codex.',
+      'Saved default targets for API profiles and variants remain claude or droid.',
+    ],
+    actions: [
+      {
+        id: 'copy-codex-alias-command',
+        label: 'Open native Codex',
+        description: 'Launch Codex through the explicit CCS runtime alias.',
+        type: 'command',
+        command: 'ccs-codex',
+      },
+      {
+        id: 'copy-codex-provider-command',
+        label: 'Run built-in Codex on Codex',
+        description: 'Use the built-in Codex provider shortcut on native Codex.',
+        type: 'command',
+        command: 'ccsxp "your prompt"',
+      },
+      {
+        id: 'copy-codex-provider-command-explicit',
+        label: 'Run built-in Codex on Codex (explicit)',
+        description: 'Use the explicit built-in Codex provider route on native Codex.',
+        type: 'command',
+        command: 'ccs codex --target codex "your prompt"',
+      },
+      {
+        id: 'open-codex-dashboard',
+        label: 'Open Codex dashboard',
+        description: 'Review Codex runtime support, config layers, and dashboard setup flows.',
+        type: 'route',
+        path: '/codex',
+      },
+    ],
+    routes: [{ label: 'Codex CLI', path: '/codex' }],
+    commands: [
+      'ccs-codex',
+      'ccsx',
+      'ccsxp "your prompt"',
+      'ccs codex --target codex "your prompt"',
+    ],
+  },
+  {
     id: 'droid-target-support',
     title: 'Factory Droid support is live',
     summary:
@@ -114,9 +169,9 @@ export const SUPPORT_NOTICES: SupportNotice[] = [
   },
   {
     id: 'updates-center-launch',
-    title: 'Updates inbox is available for rollout tasks',
+    title: 'Updates Center is available for rollout tasks',
     summary:
-      'A focused updates inbox exists for setup tasks and rollout guidance when you need it.',
+      'A focused Updates Center exists for setup tasks and rollout guidance when you need it.',
     primaryAction:
       'Use this page only when needed for rollout tasks, then return to your normal workflow.',
     publishedAt: '2026-02-25',
@@ -131,7 +186,7 @@ export const SUPPORT_NOTICES: SupportNotice[] = [
     actions: [
       {
         id: 'open-updates-page',
-        label: 'Open updates inbox when needed',
+        label: 'Open Updates Center when needed',
         description: 'Review rollout tasks only when you want guided setup changes.',
         type: 'route',
         path: '/updates',
@@ -144,7 +199,7 @@ export const SUPPORT_NOTICES: SupportNotice[] = [
         command: 'ccs config',
       },
     ],
-    routes: [{ label: 'Updates Inbox', path: '/updates' }],
+    routes: [{ label: 'Updates Center', path: '/updates' }],
     commands: ['ccs config'],
   },
 ];
@@ -186,11 +241,29 @@ export const CLI_SUPPORT_ENTRIES: CliSupportEntry[] = [
     notes: 'Use ccs-droid as the explicit runtime alias. Legacy ccsd still works.',
   },
   {
+    id: 'codex-target',
+    name: 'Codex CLI',
+    scope: 'target',
+    status: 'new',
+    summary:
+      'First-class runtime target for native Codex sessions and Codex-routed CLIProxy flows.',
+    pillars: {
+      baseUrl:
+        'Native ~/.codex config for default mode, transient -c overrides for CCS-backed routes',
+      auth: 'Native Codex auth for default mode, env_key injection for CCS-backed routes',
+      model: 'Native Codex config or routed Codex model mapping from CLIProxy',
+    },
+    routes: [{ label: 'Codex CLI', path: '/codex' }],
+    commands: ['ccs-codex', 'ccsx', 'ccs codex --target codex', 'ccs codex-api --target codex'],
+    notes:
+      'Runtime-only in v1. Saved default targets for API profiles and CLIProxy variants remain claude or droid.',
+  },
+  {
     id: 'codex-cliproxy',
     name: 'Codex via CLIProxy',
     scope: 'cliproxy',
     status: 'stable',
-    summary: 'OAuth-backed provider with configurable variant model and target.',
+    summary: 'OAuth-backed provider with configurable variant model and a native Codex shortcut.',
     pillars: {
       baseUrl: 'Managed by CLIProxy backend',
       auth: 'OAuth account via CLIProxy auth flow',
@@ -200,7 +273,15 @@ export const CLI_SUPPORT_ENTRIES: CliSupportEntry[] = [
       { label: 'CLIProxy', path: '/cliproxy' },
       { label: 'Control Panel', path: '/cliproxy/control-panel' },
     ],
-    commands: ['ccs codex', 'ccs cliproxy create mycodex --provider codex'],
+    commands: [
+      'ccsxp "your prompt"',
+      'ccs codex --target codex',
+      'ccs codex',
+      'ccs cliproxy create mycodex --provider codex',
+      'ccs api create codex-api --cliproxy-provider codex',
+    ],
+    notes:
+      'Use ccsxp when you want the built-in Codex provider on native Codex without retyping --target codex.',
   },
   {
     id: 'gemini-cliproxy',
