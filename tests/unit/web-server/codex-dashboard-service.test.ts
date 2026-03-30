@@ -234,6 +234,32 @@ wire_api = "responses"
     expect(diagnostics.warnings.some((warning) => warning.includes('missing env_key'))).toBe(true);
   });
 
+  it('does not warn for built-in openai provider without a custom model_providers entry', async () => {
+    fs.writeFileSync(path.join(codexHome, 'config.toml'), 'model_provider = "openai"\n');
+
+    const diagnostics = await getCodexDashboardDiagnostics();
+
+    expect(diagnostics.warnings.some((warning) => warning.includes('missing from [model_providers]'))).toBe(
+      false
+    );
+  });
+
+  it('allows custom providers that use requires_openai_auth without env_key warnings', async () => {
+    fs.writeFileSync(
+      path.join(codexHome, 'config.toml'),
+      `model_provider = "corp-openai"
+
+[model_providers.corp-openai]
+base_url = "https://example.test/v1"
+requires_openai_auth = true
+`
+    );
+
+    const diagnostics = await getCodexDashboardDiagnostics();
+
+    expect(diagnostics.warnings.some((warning) => warning.includes('missing env_key'))).toBe(false);
+  });
+
   it('summarizes granular approval policies without flattening them to null', async () => {
     fs.writeFileSync(
       path.join(codexHome, 'config.toml'),

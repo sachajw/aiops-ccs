@@ -22,14 +22,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { CodexDashboardDiagnostics } from '@/hooks/use-codex-types';
+import { CLIPROXY_NATIVE_CODEX_RECIPE } from '@/lib/codex-config';
 import { cn } from '@/lib/utils';
-
-const CLIPROXY_NATIVE_CODEX_RECIPE = `model_provider = "cliproxy"
-
-[model_providers.cliproxy]
-base_url = "http://127.0.0.1:8317/api/provider/codex"
-env_key = "CLIPROXY_API_KEY"
-wire_api = "responses"`;
 
 function formatTimestamp(value: number | null | undefined): string {
   if (!value || !Number.isFinite(value)) return 'N/A';
@@ -65,6 +59,10 @@ interface CodexOverviewTabProps {
 }
 
 export function CodexOverviewTab({ diagnostics }: CodexOverviewTabProps) {
+  const inspectProfileCommand = diagnostics.config.activeProfile
+    ? `codex --profile ${diagnostics.config.activeProfile}`
+    : 'codex';
+
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4 pr-1">
@@ -87,6 +85,10 @@ export function CodexOverviewTab({ diagnostics }: CodexOverviewTabProps) {
               <code>model_provider = "cliproxy"</code> plus a matching{' '}
               <code>[model_providers.cliproxy]</code> entry if you want CLIProxy as the saved native
               default.
+            </p>
+            <p>
+              Built-in <code>openai</code> and <code>oss</code> providers are also valid native
+              defaults and do not need a custom <code>[model_providers]</code> stanza.
             </p>
             <p>
               Saved default targets for API profiles and variants still remain on Claude or Droid.
@@ -281,9 +283,13 @@ export function CodexOverviewTab({ diagnostics }: CodexOverviewTabProps) {
               description: 'Use the explicit built-in Codex provider route.',
             },
             {
-              label: 'Workspace trust',
-              command: `codex --profile ${diagnostics.config.activeProfile || 'default'}`,
-              description: 'Inspect the active profile directly in native Codex.',
+              label: diagnostics.config.activeProfile
+                ? 'Inspect active profile'
+                : 'Open native Codex',
+              command: inspectProfileCommand,
+              description: diagnostics.config.activeProfile
+                ? 'Inspect the active named profile directly in native Codex.'
+                : 'Open native Codex without forcing a named profile overlay.',
             },
           ]}
         />

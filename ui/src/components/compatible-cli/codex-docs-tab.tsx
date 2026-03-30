@@ -7,6 +7,7 @@ import type {
   CompatibleCliProviderDocLink,
   CodexDashboardDiagnostics,
 } from '@/hooks/use-codex-types';
+import { CLIPROXY_NATIVE_CODEX_RECIPE } from '@/lib/codex-config';
 
 const DEFAULT_CODEX_DOC_LINKS = [
   {
@@ -43,13 +44,6 @@ const DEFAULT_PROVIDER_DOCS: CompatibleCliProviderDocLink[] = [
     url: 'https://platform.openai.com/docs/api-reference/responses',
   },
 ];
-
-const CLIPROXY_NATIVE_CODEX_RECIPE = `model_provider = "cliproxy"
-
-[model_providers.cliproxy]
-base_url = "http://127.0.0.1:8317/api/provider/codex"
-env_key = "CLIPROXY_API_KEY"
-wire_api = "responses"`;
 
 function renderTextWithLinks(text: string): ReactNode[] {
   const urlPattern = /https?:\/\/[^\s)]+/g;

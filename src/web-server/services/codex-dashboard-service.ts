@@ -72,6 +72,7 @@ const SANDBOX_MODE_VALUES = new Set(['read-only', 'workspace-write', 'danger-ful
 const WEB_SEARCH_VALUES = new Set(['cached', 'live', 'disabled']);
 const PERSONALITY_VALUES = new Set(['none', 'friendly', 'pragmatic']);
 const PROJECT_TRUST_LEVEL_VALUES = new Set(['trusted', 'untrusted']);
+const BUILT_IN_CODEX_MODEL_PROVIDERS = new Set(['openai', 'oss']);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -572,6 +573,10 @@ export function summarizeCodexModelProviders(value: unknown): CodexModelProvider
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
+function isBuiltInCodexModelProvider(name: string | null): boolean {
+  return name !== null && BUILT_IN_CODEX_MODEL_PROVIDERS.has(name);
+}
+
 export function summarizeCodexFeatureFlags(value: unknown): {
   all: CodexFeatureFlagDiagnostics[];
   enabled: CodexFeatureFlagDiagnostics[];
@@ -729,15 +734,15 @@ export async function getCodexDashboardDiagnostics(): Promise<CodexDashboardDiag
   }
   if (activeModelProvider) {
     const activeProvider = modelProviders.find((provider) => provider.name === activeModelProvider);
-    if (!activeProvider) {
+    if (!activeProvider && !isBuiltInCodexModelProvider(activeModelProvider)) {
       warnings.push(
         `Active model provider "${activeModelProvider}" is selected but missing from [model_providers].`
       );
-    } else {
+    } else if (activeProvider) {
       if (!activeProvider.baseUrl) {
         warnings.push(`Active model provider "${activeProvider.name}" is missing base_url.`);
       }
-      if (!activeProvider.envKey) {
+      if (!activeProvider.envKey && !activeProvider.requiresOpenaiAuth) {
         warnings.push(`Active model provider "${activeProvider.name}" is missing env_key.`);
       }
     }

@@ -278,6 +278,22 @@ process.exit(0);
     expect(readLoggedCodexCalls(codexArgsLogPath)).toEqual([['--version']]);
   });
 
+  it('fails with a clean CLI error when ccsxp receives a malformed --target flag', () => {
+    if (process.platform === 'win32') return;
+
+    const result = runCcsxpAlias(['--target'], {
+      ...process.env,
+      CI: '1',
+      NO_COLOR: '1',
+      CCS_HOME: tmpHome,
+      CCS_CODEX_PATH: fakeCodexPath,
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('[X] --target requires a value (claude, droid, codex)');
+    expect(result.stderr).not.toContain('at parseTargetFlags');
+  });
+
   it('passes ccs codex --target codex --version through to the native Codex binary', () => {
     if (process.platform === 'win32') return;
 

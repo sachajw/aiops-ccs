@@ -81,7 +81,8 @@ describe('help command parity', () => {
         'Fastest path: turn on the channel, save the token if needed, then run ccs.'
       )
     ).toBe(true);
-    expect(rendered.includes('Not supported for ccs glm')).toBe(true);
+    expect(rendered.includes('ccs codex')).toBe(true);
+    expect(rendered.includes('ccs --target codex')).toBe(true);
     expect(
       rendered.includes('Current-process TELEGRAM_BOT_TOKEN / DISCORD_BOT_TOKEN also work')
     ).toBe(true);

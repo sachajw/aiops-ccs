@@ -169,9 +169,9 @@ export const SUPPORT_NOTICES: SupportNotice[] = [
   },
   {
     id: 'updates-center-launch',
-    title: 'Updates inbox is available for rollout tasks',
+    title: 'Updates Center is available for rollout tasks',
     summary:
-      'A focused updates inbox exists for setup tasks and rollout guidance when you need it.',
+      'A focused Updates Center exists for setup tasks and rollout guidance when you need it.',
     primaryAction:
       'Use this page only when needed for rollout tasks, then return to your normal workflow.',
     publishedAt: '2026-02-25',
@@ -186,7 +186,7 @@ export const SUPPORT_NOTICES: SupportNotice[] = [
     actions: [
       {
         id: 'open-updates-page',
-        label: 'Open updates inbox when needed',
+        label: 'Open Updates Center when needed',
         description: 'Review rollout tasks only when you want guided setup changes.',
         type: 'route',
         path: '/updates',
@@ -199,7 +199,7 @@ export const SUPPORT_NOTICES: SupportNotice[] = [
         command: 'ccs config',
       },
     ],
-    routes: [{ label: 'Updates Inbox', path: '/updates' }],
+    routes: [{ label: 'Updates Center', path: '/updates' }],
     commands: ['ccs config'],
   },
 ];
