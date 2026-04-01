@@ -64,6 +64,7 @@
     "prebuild": "node scripts/clean-dist.js",
     "prebuild:server": "node scripts/clean-dist.js",
     "prebuild:all": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "bun run build:all",
     "postbuild:all": "node scripts/verify-bundle.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
