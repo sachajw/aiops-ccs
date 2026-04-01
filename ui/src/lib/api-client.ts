@@ -148,6 +148,72 @@ export interface ImageAnalysisStatus {
   effectiveRuntimeReason: string | null;
 }
 
+export interface ImageAnalysisSettingsConfig {
+  enabled: boolean;
+  timeout: number;
+  providerModels: Record<string, string>;
+  fallbackBackend: string | null;
+  profileBackends: Record<string, string>;
+}
+
+export interface ImageAnalysisDashboardSummary {
+  state: 'ready' | 'partial' | 'needs_setup' | 'disabled';
+  title: string;
+  detail: string;
+  backendCount: number;
+  mappedProfileCount: number;
+  activeProfileCount: number;
+  bypassedProfileCount: number;
+}
+
+export interface ImageAnalysisDashboardBackend {
+  backendId: string;
+  displayName: string;
+  model: string;
+  state: 'ready' | 'starts_on_launch' | 'needs_auth' | 'needs_proxy' | 'review';
+  authReadiness: ImageAnalysisStatus['authReadiness'];
+  authReason: string | null;
+  proxyReadiness: ImageAnalysisStatus['proxyReadiness'];
+  proxyReason: string | null;
+  profilesUsing: number;
+}
+
+export interface ImageAnalysisDashboardProfile {
+  name: string;
+  kind: 'profile' | 'variant';
+  target: CliTarget;
+  configured: boolean;
+  settingsPath: string | null;
+  backendId: string | null;
+  backendDisplayName: string | null;
+  resolutionSource: ImageAnalysisStatus['resolutionSource'];
+  status: ImageAnalysisStatus['status'];
+  effectiveRuntimeMode: ImageAnalysisStatus['effectiveRuntimeMode'];
+  effectiveRuntimeReason: string | null;
+  currentTargetMode: 'active' | 'bypassed' | 'fallback' | 'setup' | 'disabled' | 'unresolved';
+}
+
+export interface ImageAnalysisDashboardCatalog {
+  knownBackends: string[];
+  profileNames: string[];
+}
+
+export interface ImageAnalysisDashboardData {
+  config: ImageAnalysisSettingsConfig;
+  summary: ImageAnalysisDashboardSummary;
+  backends: ImageAnalysisDashboardBackend[];
+  profiles: ImageAnalysisDashboardProfile[];
+  catalog: ImageAnalysisDashboardCatalog;
+}
+
+export interface UpdateImageAnalysisSettingsPayload {
+  enabled?: boolean;
+  timeout?: number;
+  providerModels?: Record<string, string | null>;
+  fallbackBackend?: string | null;
+  profileBackends?: Record<string, string>;
+}
+
 export interface Profile {
   name: string;
   settingsPath: string;
@@ -840,6 +906,14 @@ export const api = {
     import: (data: ImportProfileRequest) =>
       request<ImportProfileResponse>('/profiles/import', {
         method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
+  imageAnalysis: {
+    get: () => request<ImageAnalysisDashboardData>('/image-analysis'),
+    update: (data: UpdateImageAnalysisSettingsPayload) =>
+      request<ImageAnalysisDashboardData>('/image-analysis', {
+        method: 'PUT',
         body: JSON.stringify(data),
       }),
   },

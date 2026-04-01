@@ -48,6 +48,7 @@ function lazyWithRetry<T extends ComponentType<unknown>>(importFn: () => Promise
 
 // Lazy-loaded sections with retry capability
 const WebSearchSection = lazyWithRetry(() => import('./sections/websearch'));
+const ImageAnalysisSection = lazyWithRetry(() => import('./sections/image-analysis'));
 const ChannelsSection = lazyWithRetry(() => import('./sections/channels'));
 const GlobalEnvSection = lazyWithRetry(() => import('./sections/globalenv-section'));
 const ThinkingSection = lazyWithRetry(() => import('./sections/thinking'));
@@ -131,6 +132,7 @@ function SettingsPageInner() {
         <SectionErrorBoundary>
           <Suspense fallback={<SectionSkeleton />}>
             {activeTab === 'websearch' && <WebSearchSection />}
+            {activeTab === 'imageanalysis' && <ImageAnalysisSection />}
             {activeTab === 'channels' && <ChannelsSection />}
             {activeTab === 'globalenv' && <GlobalEnvSection />}
             {activeTab === 'thinking' && <ThinkingSection />}
@@ -155,6 +157,7 @@ function SettingsPageInner() {
             <SectionErrorBoundary>
               <Suspense fallback={<SectionSkeleton />}>
                 {activeTab === 'websearch' && <WebSearchSection />}
+                {activeTab === 'imageanalysis' && <ImageAnalysisSection />}
                 {activeTab === 'channels' && <ChannelsSection />}
                 {activeTab === 'globalenv' && <GlobalEnvSection />}
                 {activeTab === 'thinking' && <ThinkingSection />}
