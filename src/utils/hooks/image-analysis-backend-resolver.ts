@@ -292,6 +292,17 @@ function resolveBackend(
     };
   }
 
+  const hasDirectAnthropicApiKey = Boolean(settings?.env?.ANTHROPIC_API_KEY?.trim());
+  const hasBaseUrl = Boolean(settings?.env?.ANTHROPIC_BASE_URL?.trim());
+  if (hasDirectAnthropicApiKey && !hasBaseUrl) {
+    return {
+      backendId: null,
+      backendDisplayName: null,
+      resolutionSource: 'unresolved',
+      reason: 'Direct Anthropic settings profiles use native file access unless explicitly mapped.',
+    };
+  }
+
   const fallbackBackend = normalizeImageAnalysisBackendId(
     config.fallback_backend,
     Object.keys(config.provider_models)
@@ -323,7 +334,10 @@ export function resolveImageAnalysisStatus(
     ? (config.provider_models[resolution.backendId] ?? null)
     : null;
   const shouldPersistHook =
-    config.enabled && context.profileType !== 'default' && context.profileType !== 'account';
+    config.enabled &&
+    context.profileType !== 'default' &&
+    context.profileType !== 'account' &&
+    Boolean(resolution.backendId && model);
 
   let status: ImageAnalysisStatusCode = 'active';
   let reason = resolution.reason;
@@ -353,8 +367,16 @@ export function resolveImageAnalysisStatus(
     (!context.cliproxyBridge.usesCurrentTarget || !context.cliproxyBridge.usesCurrentAuthToken)
   ) {
     status = 'attention';
-    reason =
-      'Active, but runtime uses the current CLIProxy target instead of the stale route saved in this profile.';
+    if (!context.cliproxyBridge.usesCurrentTarget && !context.cliproxyBridge.usesCurrentAuthToken) {
+      reason =
+        'Runtime uses the current CLIProxy route and auth token instead of the saved values in this profile.';
+    } else if (!context.cliproxyBridge.usesCurrentTarget) {
+      reason =
+        'Runtime uses the current CLIProxy route instead of the saved route in this profile.';
+    } else {
+      reason =
+        'Runtime uses the current CLIProxy auth token instead of the saved token in this profile.';
+    }
   } else if (resolution.resolutionSource === 'profile-backend') {
     status = 'mapped';
   }

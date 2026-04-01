@@ -303,6 +303,13 @@ function resolveImageAnalysisStatusForProfile(
   };
 }
 
+function resolvePreviewImageAnalysisStatus(profileOrVariant: string, settings: Settings) {
+  const normalizedSettings = canonicalizeProfileSettings(profileOrVariant, settings);
+  const settingsPath = resolveSettingsPath(profileOrVariant);
+
+  return resolveImageAnalysisStatusForProfile(profileOrVariant, normalizedSettings, settingsPath);
+}
+
 function writeSettingsAtomically(settingsPath: string, settings: Settings): void {
   const tempPath = `${settingsPath}.tmp.${process.pid}`;
   fs.writeFileSync(tempPath, JSON.stringify(settings, null, 2) + '\n');
@@ -422,6 +429,29 @@ router.get('/:profile/raw', (req: Request, res: Response): void => {
       path: settingsPath,
       cliproxyBridge: resolveCliproxyBridgeMetadata(settings),
       imageAnalysisStatus: resolveImageAnalysisStatusForProfile(profile, settings, settingsPath),
+    });
+  } catch (error) {
+    respondInternalError(res, error, 'Internal server error.');
+  }
+});
+
+/**
+ * POST /api/settings/:profile/image-analysis-status - Preview image analysis status from editor JSON
+ */
+router.post('/:profile/image-analysis-status', (req: Request, res: Response): void => {
+  if (!requireSensitiveLocalAccess(req, res)) return;
+
+  try {
+    const { profile } = req.params;
+    const { settings } = req.body;
+
+    if (!settings || typeof settings !== 'object') {
+      res.status(400).json({ error: 'settings object is required in request body' });
+      return;
+    }
+
+    res.json({
+      imageAnalysisStatus: resolvePreviewImageAnalysisStatus(profile, settings as Settings),
     });
   } catch (error) {
     respondInternalError(res, error, 'Internal server error.');

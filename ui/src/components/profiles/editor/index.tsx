@@ -4,7 +4,7 @@
  */
 
 /* eslint-disable react-refresh/only-export-components */
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useDeferredValue } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -106,6 +106,63 @@ export function ProfileEditor({
     if (rawJsonEdits !== null) return rawJsonEdits !== JSON.stringify(settings, null, 2);
     return Object.keys(localEdits).length > 0;
   }, [rawJsonEdits, localEdits, settings]);
+
+  const deferredPreviewJson = useDeferredValue(computedRawJsonContent);
+  const previewSettings = useMemo((): Settings | null => {
+    if (!computedHasChanges || !computedIsRawJsonValid) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(deferredPreviewJson) as Settings;
+    } catch {
+      return null;
+    }
+  }, [computedHasChanges, computedIsRawJsonValid, deferredPreviewJson]);
+
+  const {
+    data: previewStatusResponse,
+    isFetching: isPreviewStatusFetching,
+    isError: isPreviewStatusError,
+  } = useQuery<{ imageAnalysisStatus: SettingsResponse['imageAnalysisStatus'] }>({
+    queryKey: ['settings', profileName, 'image-analysis-status-preview', deferredPreviewJson],
+    enabled: previewSettings !== null,
+    placeholderData: (previousData) => previousData,
+    queryFn: async () => {
+      const res = await fetch(`/api/settings/${profileName}/image-analysis-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings: previewSettings }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to preview image-analysis status: ${res.status}`);
+      }
+
+      return res.json();
+    },
+  });
+
+  const imageAnalysisStatus =
+    computedHasChanges && computedIsRawJsonValid && !isPreviewStatusError
+      ? (previewStatusResponse?.imageAnalysisStatus ?? data?.imageAnalysisStatus)
+      : data?.imageAnalysisStatus;
+  const imageAnalysisStatusSource =
+    computedHasChanges &&
+    computedIsRawJsonValid &&
+    !isPreviewStatusError &&
+    previewStatusResponse?.imageAnalysisStatus
+      ? 'editor'
+      : 'saved';
+  const imageAnalysisStatusPreviewState = !computedHasChanges
+    ? 'saved'
+    : !computedIsRawJsonValid
+      ? 'invalid'
+      : isPreviewStatusError
+        ? 'saved'
+        : isPreviewStatusFetching && !previewStatusResponse?.imageAnalysisStatus
+          ? 'refreshing'
+          : 'preview';
 
   // Check for missing required fields (informational warning)
   const missingRequiredFields = useMemo(() => {
@@ -254,7 +311,9 @@ export function ProfileEditor({
               isRawJsonValid={computedIsRawJsonValid}
               rawJsonEdits={rawJsonEdits}
               settings={settings}
-              imageAnalysisStatus={data?.imageAnalysisStatus}
+              imageAnalysisStatus={imageAnalysisStatus}
+              imageAnalysisStatusSource={imageAnalysisStatusSource}
+              imageAnalysisStatusPreviewState={imageAnalysisStatusPreviewState}
               onChange={handleRawJsonChange}
               missingRequiredFields={missingRequiredFields}
             />

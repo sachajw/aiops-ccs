@@ -1013,12 +1013,55 @@ async function main(): Promise<void> {
       }
 
       const webSearchEnv = getWebSearchHookEnv();
-      const imageAnalysisEnv = getImageAnalysisHookEnv({
+      let imageAnalysisEnv = getImageAnalysisHookEnv({
         profileName: profileInfo.name,
         profileType: profileInfo.type,
         settings,
         cliproxyBridge,
       });
+
+      const imageAnalysisProvider = imageAnalysisEnv['CCS_CURRENT_PROVIDER'];
+      if (
+        resolvedTarget === 'claude' &&
+        imageAnalysisEnv['CCS_IMAGE_ANALYSIS_SKIP'] !== '1' &&
+        imageAnalysisProvider
+      ) {
+        const verboseProxyLaunch =
+          remainingArgs.includes('--verbose') ||
+          remainingArgs.includes('-v') ||
+          targetRemainingArgs.includes('--verbose') ||
+          targetRemainingArgs.includes('-v');
+
+        if (!isAuthenticated(imageAnalysisProvider as CLIProxyProvider)) {
+          console.error(
+            info(
+              `Image analysis via ${imageAnalysisProvider} is configured, but CLIProxy auth is missing. This session will use native Read. Run "ccs ${imageAnalysisProvider} --auth" to enable it.`
+            )
+          );
+          imageAnalysisEnv = {
+            ...imageAnalysisEnv,
+            CCS_CURRENT_PROVIDER: '',
+            CCS_IMAGE_ANALYSIS_SKIP: '1',
+          };
+        } else {
+          const ensureServiceResult = await ensureCliproxyService(
+            CLIPROXY_DEFAULT_PORT,
+            verboseProxyLaunch
+          );
+          if (!ensureServiceResult.started) {
+            console.error(
+              warn(
+                `Image analysis via ${imageAnalysisProvider} is unavailable because CCS could not start the local CLIProxy service. This session will use native Read.`
+              )
+            );
+            imageAnalysisEnv = {
+              ...imageAnalysisEnv,
+              CCS_CURRENT_PROVIDER: '',
+              CCS_IMAGE_ANALYSIS_SKIP: '1',
+            };
+          }
+        }
+      }
       // Get global env vars (DISABLE_TELEMETRY, etc.) for third-party profiles
       const globalEnvConfig = getGlobalEnvConfig();
       const globalEnv = globalEnvConfig.enabled ? globalEnvConfig.env : {};

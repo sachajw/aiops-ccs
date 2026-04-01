@@ -21,6 +21,8 @@ interface RawEditorSectionProps {
   rawJsonEdits: string | null;
   settings: Settings | undefined;
   imageAnalysisStatus?: ImageAnalysisStatus | null;
+  imageAnalysisStatusSource?: 'saved' | 'editor';
+  imageAnalysisStatusPreviewState?: 'saved' | 'preview' | 'refreshing' | 'invalid';
   onChange: (value: string) => void;
   missingRequiredFields?: string[];
 }
@@ -31,6 +33,8 @@ export function RawEditorSection({
   rawJsonEdits,
   settings,
   imageAnalysisStatus,
+  imageAnalysisStatusSource = 'saved',
+  imageAnalysisStatusPreviewState = 'saved',
   onChange,
   missingRequiredFields = [],
 }: RawEditorSectionProps) {
@@ -80,7 +84,11 @@ export function RawEditorSection({
           </div>
         </div>
         <div className="mx-6 mb-4">
-          <ImageAnalysisStatusSection status={imageAnalysisStatus} />
+          <ImageAnalysisStatusSection
+            status={imageAnalysisStatus}
+            source={imageAnalysisStatusSource}
+            previewState={imageAnalysisStatusPreviewState}
+          />
         </div>
         {/* Global Env Indicator */}
         <div className="mx-6 mb-4">

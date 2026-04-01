@@ -5,6 +5,8 @@ import type { ImageAnalysisStatus } from '@/lib/api-client';
 
 interface ImageAnalysisStatusSectionProps {
   status?: ImageAnalysisStatus | null;
+  source?: 'saved' | 'editor';
+  previewState?: 'saved' | 'preview' | 'refreshing' | 'invalid';
 }
 
 function getBadge(status: ImageAnalysisStatus | null | undefined): {
@@ -13,7 +15,7 @@ function getBadge(status: ImageAnalysisStatus | null | undefined): {
 } {
   switch (status?.status) {
     case 'active':
-      return { label: 'Ready', variant: 'default' };
+      return { label: 'Configured', variant: 'default' };
     case 'mapped':
       return { label: 'Saved mapping', variant: 'secondary' };
     case 'attention':
@@ -36,33 +38,56 @@ function getSummary(status: ImageAnalysisStatus): string {
     case 'disabled':
       return "Disabled globally. This profile uses Claude's built-in file reading because CCS image analysis is turned off.";
     case 'mapped':
-      return `Ready via saved ${backendName} mapping. CCS could not infer the backend from this alias, so it uses the mapping saved in CCS config.`;
+      return `Configured via saved ${backendName} mapping. CCS could not infer the backend from this alias, so it uses the mapping saved in CCS config when image analysis is available for the session.`;
     case 'attention':
-      return `Ready via ${backendName}, but runtime is using the current CLIProxy route instead of the route saved in this profile.`;
+      return `Configured via ${backendName}, but ${status.reason || 'runtime details no longer match the saved profile state.'}`;
     case 'hook-missing':
-      return `Configured for ${backendName}, but the image-analysis hook is not fully installed yet.`;
+      return `Configured for ${backendName}, but ${status.reason || 'the image-analysis hook is not fully installed yet.'}`;
     case 'skipped':
       return status.reason || 'Skipped for this profile.';
     case 'active':
     default:
       if (status.resolutionSource === 'cliproxy-bridge') {
-        return `Ready via ${backendName}. Images and PDFs are routed through CLIProxy before Claude sees text.`;
+        return `Configured via ${backendName}. Image and PDF reads use CLIProxy when the local hook runtime is available for this session.`;
       }
 
       if (status.resolutionSource === 'fallback-backend') {
-        return `Ready via ${backendName} fallback. Images and PDFs are routed through CLIProxy before Claude sees text.`;
+        return `Configured via ${backendName} fallback. Image and PDF reads use CLIProxy when the local hook runtime is available for this session.`;
       }
 
-      return `Ready via ${backendName}. Images and PDFs are routed through CLIProxy before Claude sees text.`;
+      return `Configured via ${backendName}. Image and PDF reads use CLIProxy when the local hook runtime is available for this session.`;
   }
 }
 
 function getRuntimeLine(status: ImageAnalysisStatus): string {
+  if (status.status === 'hook-missing') {
+    return 'Read -> native file access (hook install required)';
+  }
+
   if (!status.runtimePath) {
     return 'Read -> native file access';
   }
 
   return `Read -> image-analysis hook -> ${status.runtimePath}`;
+}
+
+function getStatusContext(
+  source: 'saved' | 'editor',
+  previewState: ImageAnalysisStatusSectionProps['previewState']
+): string {
+  if (previewState === 'invalid') {
+    return 'Showing last saved runtime status. The live preview resumes when the JSON above is valid again.';
+  }
+
+  if (previewState === 'refreshing') {
+    return 'Refreshing the live preview from the current editor state.';
+  }
+
+  if (source === 'editor') {
+    return 'Live preview from the current editor state. Save to persist these backend and hook changes.';
+  }
+
+  return 'Saved runtime status for this profile. This section is derived and is not written into the JSON editor above.';
 }
 
 function getPersistenceLine(status: ImageAnalysisStatus): string {
@@ -77,7 +102,11 @@ function getPersistenceLine(status: ImageAnalysisStatus): string {
   return `${status.persistencePath} hook missing`;
 }
 
-export function ImageAnalysisStatusSection({ status }: ImageAnalysisStatusSectionProps) {
+export function ImageAnalysisStatusSection({
+  status,
+  source = 'saved',
+  previewState = 'saved',
+}: ImageAnalysisStatusSectionProps) {
   if (!status) {
     return (
       <div className="rounded-md border bg-muted/20 p-4" aria-live="polite">
@@ -101,7 +130,7 @@ export function ImageAnalysisStatusSection({ status }: ImageAnalysisStatusSectio
             <h3 className="text-sm font-semibold">Image-analysis backend</h3>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Derived runtime status. This section is not written into the JSON editor above.
+            {getStatusContext(source, previewState)}
           </p>
         </div>
         <Badge variant={badge.variant} className="shrink-0 text-[11px]">

@@ -44,11 +44,17 @@ describe('image-analysis-backend-resolver', () => {
     expect(status.resolutionSource).toBe('copilot-alias');
   });
 
-  it('uses the fallback backend for an unmapped settings profile', () => {
+  it('uses the fallback backend for an unmapped third-party settings profile', () => {
     const status = resolveImageAnalysisStatus(
       {
         profileName: 'glm',
         profileType: 'settings',
+        settings: {
+          env: {
+            ANTHROPIC_BASE_URL: 'https://api.z.ai/v1',
+            ANTHROPIC_AUTH_TOKEN: 'glm-test-key',
+          },
+        },
       },
       DEFAULT_IMAGE_ANALYSIS_CONFIG
     );
@@ -57,6 +63,27 @@ describe('image-analysis-backend-resolver', () => {
     expect(status.backendId).toBe('gemini');
     expect(status.resolutionSource).toBe('fallback-backend');
     expect(status.model).toBe('gemini-2.5-flash');
+  });
+
+  it('keeps direct Anthropic settings profiles on native read unless explicitly mapped', () => {
+    const status = resolveImageAnalysisStatus(
+      {
+        profileName: 'claude-direct',
+        profileType: 'settings',
+        settings: {
+          env: {
+            ANTHROPIC_API_KEY: 'anthropic-test-key',
+          },
+        },
+      },
+      DEFAULT_IMAGE_ANALYSIS_CONFIG
+    );
+
+    expect(status.supported).toBe(false);
+    expect(status.backendId).toBeNull();
+    expect(status.status).toBe('skipped');
+    expect(status.shouldPersistHook).toBe(false);
+    expect(status.reason).toContain('native file access');
   });
 
   it('uses explicit profile_backends overrides for custom aliases', () => {
@@ -86,6 +113,12 @@ describe('image-analysis-backend-resolver', () => {
       {
         profileName: 'glm',
         profileType: 'settings',
+        settings: {
+          env: {
+            ANTHROPIC_BASE_URL: 'https://api.z.ai/v1',
+            ANTHROPIC_AUTH_TOKEN: 'glm-test-key',
+          },
+        },
         hookInstalled: false,
         sharedHookInstalled: true,
       },

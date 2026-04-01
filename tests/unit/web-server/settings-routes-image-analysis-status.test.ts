@@ -113,6 +113,33 @@ describe('settings-routes image-analysis status', () => {
     expect(body.imageAnalysisStatus.persistencePath).toContain('glm.settings.json');
   });
 
+  it('keeps direct Anthropic settings profiles on native read diagnostics', async () => {
+    writeJson(path.join(tempHome, '.ccs', 'claude-direct.settings.json'), {
+      env: {
+        ANTHROPIC_API_KEY: 'anthropic-test-key',
+      },
+    });
+
+    const response = await fetch(`${baseUrl}/api/settings/claude-direct/raw`);
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      imageAnalysisStatus: {
+        status: string;
+        backendId: string | null;
+        shouldPersistHook: boolean;
+        runtimePath: string | null;
+        reason: string | null;
+      };
+    };
+
+    expect(body.imageAnalysisStatus.status).toBe('skipped');
+    expect(body.imageAnalysisStatus.backendId).toBeNull();
+    expect(body.imageAnalysisStatus.shouldPersistHook).toBe(false);
+    expect(body.imageAnalysisStatus.runtimePath).toBeNull();
+    expect(body.imageAnalysisStatus.reason).toContain('native file access');
+  });
+
   it('returns explicit mapped status for custom aliases', async () => {
     writeJson(path.join(tempHome, '.ccs', 'config.yaml'), {
       version: 11,
@@ -182,5 +209,36 @@ describe('settings-routes image-analysis status', () => {
     expect(body.path).toBe(customSettingsPath);
     expect(body.imageAnalysisStatus.persistencePath).toBe(customSettingsPath);
     expect(body.imageAnalysisStatus.hookInstalled).toBe(true);
+  });
+
+  it('previews image-analysis status from unsaved editor settings', async () => {
+    writeProfileSettings(tempHome, 'glm', {
+      ANTHROPIC_BASE_URL: 'https://api.z.ai/v1',
+      ANTHROPIC_API_KEY: 'glm-test-key',
+    });
+
+    const response = await fetch(`${baseUrl}/api/settings/glm/image-analysis-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        settings: {
+          env: {
+            ANTHROPIC_BASE_URL: 'https://proxy.example/api/provider/ghcp',
+            ANTHROPIC_AUTH_TOKEN: 'preview-token',
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      imageAnalysisStatus: {
+        backendId: string | null;
+        resolutionSource: string;
+      };
+    };
+
+    expect(body.imageAnalysisStatus.backendId).toBe('ghcp');
+    expect(body.imageAnalysisStatus.resolutionSource).toBe('cliproxy-bridge');
   });
 });
