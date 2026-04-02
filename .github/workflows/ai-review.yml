@@ -178,8 +178,6 @@ jobs:
             echo "review_mode=$REVIEW_MODE"
             echo "review_scope=$REVIEW_SCOPE"
             echo "review_mode_reason=$REVIEW_MODE_REASON"
-            echo "max_turns=$MAX_TURNS"
-            echo "max_thinking_tokens=$MAX_THINKING_TOKENS"
             echo "claude_timeout_minutes=$CLAUDE_TIMEOUT_MINUTES"
             echo "runs_on=$RUNS_ON"
           } >> "$GITHUB_OUTPUT"
@@ -543,8 +541,6 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REVIEW_MARKER: >-
             <!-- ccs-ai-review
-            run:${{ github.run_id }}
-            attempt:${{ github.run_attempt }}
             pr:${{ needs.prepare.outputs.pr_number }}
             sha:${{ needs.prepare.outputs.head_sha }} -->
         run: |

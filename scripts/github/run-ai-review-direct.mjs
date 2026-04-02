@@ -271,7 +271,7 @@ export async function writeDirectReviewFromEnv(env = process.env, fetchImpl = gl
         attempt === 1
           ? buildPrimaryPrompt({ meta, packet })
           : `${buildPrimaryPrompt({ meta, packet })}\n\n${buildRepairPrompt({ validationReason: lastReason, previousCandidate })}`;
-      const startedAt = new Date().toISOString();
+      const attemptStartedAt = new Date().toISOString();
       const responseJson = await postReviewRequest({
         apiUrl: cleanText(env.ANTHROPIC_BASE_URL),
         apiKey: cleanText(env.ANTHROPIC_AUTH_TOKEN),
@@ -286,7 +286,7 @@ export async function writeDirectReviewFromEnv(env = process.env, fetchImpl = gl
       const validation = normalizeStructuredOutput(previousCandidate);
       attempts.push({
         attempt,
-        startedAt,
+        startedAt: attemptStartedAt,
         status: validation.ok ? 'validated' : 'invalid',
         timeoutMs: attemptWindow.timeoutMs,
         validationReason: validation.ok ? null : validation.reason,

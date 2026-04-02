@@ -52,5 +52,11 @@ describe('ai-review workflow', () => {
       '${{ steps.review-packet.outputs.packet_included_files }}'
     );
     expect(directReviewStep?.env?.AI_REVIEW_REQUEST_BUFFER_MS).toBe(45000);
+
+    const publishStep = steps.find((step) => step.name === 'Publish review comment');
+    expect(publishStep).toBeDefined();
+    expect(String(publishStep?.env?.REVIEW_MARKER)).toContain('pr:${{ needs.prepare.outputs.pr_number }}');
+    expect(String(publishStep?.env?.REVIEW_MARKER)).toContain('sha:${{ needs.prepare.outputs.head_sha }}');
+    expect(String(publishStep?.env?.REVIEW_MARKER)).not.toContain('run:${{ github.run_id }}');
   });
 });
