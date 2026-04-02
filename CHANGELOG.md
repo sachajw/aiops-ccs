@@ -1,3 +1,9 @@
+## [7.65.3](https://github.com/kaitranntt/ccs/compare/v7.65.2...v7.65.3) (2026-04-02)
+
+### Hotfixes
+
+* **ci:** restore default ai review output ([58a0fc4](https://github.com/kaitranntt/ccs/commit/58a0fc43e6ce89be7288bb14d4a20ac4165320f0))
+
 ## [7.65.2](https://github.com/kaitranntt/ccs/compare/v7.65.1...v7.65.2) (2026-04-02)
 
 ### Hotfixes
