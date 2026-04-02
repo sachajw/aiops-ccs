@@ -67,4 +67,23 @@ describe('image-analyzer-profile-hook-injector', () => {
     expect(fs.existsSync(defaultSettingsPath)).toBe(false);
     expect(persisted.hooks?.PreToolUse?.some((hook) => hook.matcher === 'Read')).toBe(true);
   });
+
+  it('skips copilot hook persistence when the shared fallback hook is unavailable', () => {
+    const settingsPath = path.join(tempHome, '.ccs', 'copilot.settings.json');
+    writeJson(settingsPath, {});
+
+    const ensured = ensureProfileHooks({
+      profileName: 'copilot',
+      profileType: 'copilot',
+      settingsPath,
+      sharedHookInstalled: false,
+    });
+
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      hooks?: { PreToolUse?: Array<{ matcher?: string }> };
+    };
+
+    expect(ensured).toBe(false);
+    expect(persisted.hooks).toBeUndefined();
+  });
 });

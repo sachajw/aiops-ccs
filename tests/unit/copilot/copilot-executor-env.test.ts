@@ -136,11 +136,15 @@ describe('generateCopilotEnv', () => {
           port: 8317,
         };
       },
+      getLocalRuntimeApiKey: () => 'local-runtime-token',
     });
 
     expect(ensureCalls).toBe(1);
     expect(result.env.CCS_CURRENT_PROVIDER).toBe('ghcp');
     expect(result.env.CCS_IMAGE_ANALYSIS_SKIP).toBe('0');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_BASE_URL).toBe('http://127.0.0.1:8317');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_PATH).toBe('/api/provider/ghcp');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_API_KEY).toBe('local-runtime-token');
     expect(result.warning).toBeNull();
   });
 });

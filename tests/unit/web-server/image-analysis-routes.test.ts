@@ -171,7 +171,7 @@ describe('image-analysis routes', () => {
         expect.objectContaining({
           name: 'glm',
           target: 'claude',
-          currentTargetMode: 'setup',
+          currentTargetMode: 'fallback',
         }),
         expect.objectContaining({
           name: 'codexProfile',

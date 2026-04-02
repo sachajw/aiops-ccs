@@ -384,6 +384,41 @@ describe('CLAUDECODE environment stripping', () => {
     });
   });
 
+  it('headless executor prepares image-analysis MCP and compatibility hook fallback', async () => {
+    writeConfigWithAutoUpdatePreference(false);
+    const ccsDir = path.join(process.env.CCS_HOME as string, '.ccs');
+    const settingsPath = path.join(ccsDir, 'glm.settings.json');
+    fs.writeFileSync(settingsPath, '{}\n', 'utf8');
+    process.env.CCS_CLAUDE_PATH = 'claude';
+
+    const result = await HeadlessExecutor.execute('glm', 'describe screenshot', {
+      permissionMode: 'default',
+      timeout: 1000,
+    });
+
+    expect(result.success).toBe(true);
+    expect(spawnCalls.length).toBeGreaterThan(0);
+
+    const persistedSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      hooks?: { PreToolUse?: Array<{ matcher?: string }> };
+    };
+    expect(persistedSettings.hooks?.PreToolUse?.some((hook) => hook.matcher === 'Read')).toBe(true);
+
+    const claudeUserConfig = JSON.parse(
+      fs.readFileSync(path.join(process.env.CCS_HOME as string, '.claude.json'), 'utf8')
+    ) as {
+      mcpServers?: Record<string, unknown>;
+    };
+    expect(claudeUserConfig.mcpServers?.['ccs-image-analysis']).toEqual({
+      type: 'stdio',
+      command: 'node',
+      args: [path.join(ccsDir, 'mcp', 'ccs-image-analysis-server.cjs')],
+      env: {},
+    });
+    expect(fs.existsSync(path.join(ccsDir, 'hooks', 'image-analyzer-transformer.cjs'))).toBe(true);
+    expect(fs.existsSync(path.join(ccsDir, 'hooks', 'image-analysis-runtime.cjs'))).toBe(true);
+  });
+
   it('headless executor propagates a WebSearch trace launch id when tracing is enabled', async () => {
     writeConfigWithAutoUpdatePreference(false);
     const ccsDir = path.join(process.env.CCS_HOME as string, '.ccs');

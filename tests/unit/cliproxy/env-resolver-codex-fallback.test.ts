@@ -258,6 +258,44 @@ describe('resolveCliproxyImageAnalysisEnv', () => {
 
     expect(result.env.CCS_CURRENT_PROVIDER).toBe('agy');
     expect(result.env.CCS_IMAGE_ANALYSIS_SKIP).toBe('0');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_BASE_URL).toBe('https://remote.example.com:9443');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_PATH).toBe('/api/provider/agy');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_API_KEY).toBe('remote-token');
+    expect(result.warning).toBeNull();
+  });
+
+  it('pins local cliproxy image analysis to the resolved local API key', async () => {
+    const result = await resolveCliproxyImageAnalysisEnv(
+      {
+        profileName: 'orq',
+        provider: 'agy',
+        profileSettingsPath: '/tmp/orq.settings.json',
+        proxyTarget: {
+          host: '127.0.0.1',
+          port: 8317,
+          protocol: 'http',
+          isRemote: false,
+        },
+        proxyReachable: true,
+      },
+      {
+        getImageAnalysisHookEnv: () => ({
+          CCS_IMAGE_ANALYSIS_ENABLED: '1',
+          CCS_IMAGE_ANALYSIS_TIMEOUT: '60',
+          CCS_IMAGE_ANALYSIS_PROVIDER_MODELS: 'agy:gemini-2.5-pro',
+          CCS_CURRENT_PROVIDER: 'agy',
+          CCS_IMAGE_ANALYSIS_SKIP: '0',
+        }),
+        hasImageAnalysisProfileHook: () => true,
+        hasImageAnalyzerHook: () => true,
+        resolveImageAnalysisRuntimeStatus: async () => createImageAnalysisStatus(),
+        getLocalRuntimeApiKey: () => 'local-runtime-token',
+      }
+    );
+
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_BASE_URL).toBe('http://127.0.0.1:8317');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_PATH).toBe('/api/provider/agy');
+    expect(result.env.CCS_IMAGE_ANALYSIS_RUNTIME_API_KEY).toBe('local-runtime-token');
     expect(result.warning).toBeNull();
   });
 });

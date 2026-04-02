@@ -130,8 +130,14 @@ describe('profile-writer Anthropic direct', () => {
       'utf8'
     );
 
-    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
-      throw new Error('copy should not run when WebSearch is disabled');
+    const originalCopyFileSync = fs.copyFileSync.bind(fs);
+    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation((source, destination) => {
+      const sourcePath = String(source);
+      const destinationPath = String(destination);
+      if (sourcePath.includes('websearch') || destinationPath.includes('websearch')) {
+        throw new Error('websearch copy should not run when WebSearch is disabled');
+      }
+      return originalCopyFileSync(source, destination);
     });
 
     const result = createApiProfile(
@@ -142,9 +148,12 @@ describe('profile-writer Anthropic direct', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(copyFileSpy).not.toHaveBeenCalled();
+    expect(copyFileSpy).toHaveBeenCalled();
     expect(fs.existsSync(path.join(tempHome, '.ccs', 'disabled-websearch.settings.json'))).toBe(
       true
+    );
+    expect(fs.existsSync(path.join(tempHome, '.ccs', 'hooks', 'websearch-transformer.cjs'))).toBe(
+      false
     );
   });
 });

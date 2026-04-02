@@ -171,15 +171,22 @@ describe('profile lifecycle service', () => {
     fs.writeFileSync(path.join(ccsDir, 'config.json'), JSON.stringify({ profiles: {} }, null, 2) + '\n');
     fs.writeFileSync(path.join(ccsDir, 'config.yaml'), 'version: 12\nwebsearch:\n  enabled: false\n', 'utf8');
 
-    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
-      throw new Error('copy should not run when WebSearch is disabled');
+    const originalCopyFileSync = fs.copyFileSync.bind(fs);
+    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation((source, destination) => {
+      const sourcePath = String(source);
+      const destinationPath = String(destination);
+      if (sourcePath.includes('websearch') || destinationPath.includes('websearch')) {
+        throw new Error('websearch copy should not run when WebSearch is disabled');
+      }
+      return originalCopyFileSync(source, destination);
     });
 
     const result = await runInScopedCcsDir(() => registerApiProfileOrphans({ names: ['extra'] }));
 
-    expect(copyFileSpy).not.toHaveBeenCalled();
+    expect(copyFileSpy).toHaveBeenCalled();
     expect(result.registered).toEqual(['extra']);
     expect(result.skipped).toEqual([]);
+    expect(fs.existsSync(path.join(ccsDir, 'hooks', 'websearch-transformer.cjs'))).toBe(false);
   });
 
   it('registers malformed orphan settings when force bypasses validation', async () => {

@@ -116,7 +116,7 @@ describe('image-analysis-runtime-status', () => {
     expect(status.effectiveRuntimeReason).toContain('remote.example:443');
   });
 
-  it('keeps hook-missing on native read even when auth and proxy are ready', async () => {
+  it('keeps hook-missing as a degraded fallback state while primary runtime stays active', async () => {
     const status = await hydrateImageAnalysisRuntimeStatus(
       createStatus({
         status: 'hook-missing',
@@ -144,7 +144,7 @@ describe('image-analysis-runtime-status', () => {
 
     expect(status.authReadiness).toBe('ready');
     expect(status.proxyReadiness).toBe('ready');
-    expect(status.effectiveRuntimeMode).toBe('native-read');
+    expect(status.effectiveRuntimeMode).toBe('cliproxy-image-analysis');
     expect(status.effectiveRuntimeReason).toContain('Profile hook is missing');
   });
 });

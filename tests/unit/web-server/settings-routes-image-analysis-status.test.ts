@@ -12,9 +12,17 @@ function writeJson(filePath: string, value: Record<string, unknown>): void {
 }
 
 function installSharedHook(tempHome: string): string {
-  const hookPath = path.join(tempHome, '.ccs', 'hooks', 'image-analyzer-transformer.cjs');
-  fs.mkdirSync(path.dirname(hookPath), { recursive: true });
-  fs.writeFileSync(hookPath, '#!/usr/bin/env node\n', 'utf8');
+  const hooksDir = path.join(tempHome, '.ccs', 'hooks');
+  fs.mkdirSync(hooksDir, { recursive: true });
+
+  for (const fileName of ['image-analyzer-transformer.cjs', 'image-analysis-runtime.cjs']) {
+    fs.copyFileSync(
+      path.join(process.cwd(), 'lib', 'hooks', fileName),
+      path.join(hooksDir, fileName)
+    );
+  }
+
+  const hookPath = path.join(hooksDir, 'image-analyzer-transformer.cjs');
   return hookPath;
 }
 
