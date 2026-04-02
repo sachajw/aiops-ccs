@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const reviewOutput = await import('../../../../scripts/github/normalize-ai-review-output.mjs');
+const { marked } = await import('marked');
 
 function withTempDir(prefix: string, run: (tempDir: string) => void) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -52,21 +53,23 @@ describe('normalize-ai-review-output', () => {
     );
 
     expect(validation.ok).toBe(true);
-    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5.1' });
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
 
-    expect(markdown).toContain('### 📋 Summary');
-    expect(markdown).toContain('### 🔴 High');
-    expect(markdown).toContain('**`src/cliproxy/accounts/query.ts:61` — Ambiguous account lookup drops valid matches**');
-    expect(markdown).toContain('### 🔒 Security Checklist');
+    expect(markdown).toContain('### Verdict');
+    expect(markdown).toContain('### Top Findings');
+    expect(markdown).toContain('- 🔴 High `src/cliproxy/accounts/query.ts:61` — Ambiguous account lookup drops valid matches');
+    expect(markdown).toContain('### Detailed Findings (1)');
+    expect(markdown).toContain('#### 1. Ambiguous account lookup drops valid matches');
+    expect(markdown).toContain('- Location: `src/cliproxy/accounts/query.ts:61`');
+    expect(markdown).toContain('### Security Checklist (1)');
     expect(markdown).toContain('| Injection safety | ✅ | No user-controlled input reaches a shell, SQL, or HTML boundary in this diff. |');
-    expect(markdown).toContain('### 📊 CCS Compliance');
+    expect(markdown).toContain('### CCS Compliance (1)');
     expect(markdown).toContain('| No emojis in CLI | N/A | This change affects GitHub PR comments only, not CLI stdout. |');
-    expect(markdown).toContain('### 💡 Informational');
-    expect(markdown).toContain('### ✅ What\'s Done Well');
-    expect(markdown).toContain('### 🎯 Overall Assessment');
+    expect(markdown).toContain('### Informational (1)');
+    expect(markdown).toContain("### What's Done Well (1)");
     expect(markdown).toContain('**❌ CHANGES REQUESTED**');
-    expect(markdown).toContain('Why it matters: That breaks normal selection flows for users with multiple Codex sessions.');
-    expect(markdown).toContain('> 🤖 Reviewed by `glm-5.1`');
+    expect(markdown).toContain('Impact: That breaks normal selection flows for users with multiple Codex sessions.');
+    expect(markdown).toContain('> 🤖 Reviewed by `glm-5-turbo`');
   });
 
   test('renders mode-aware review context metadata without changing the structured review contract', () => {
@@ -97,22 +100,195 @@ describe('normalize-ai-review-output', () => {
 
     expect(validation.ok).toBe(true);
     const markdown = reviewOutput.renderStructuredReview(validation.value, {
-      model: 'glm-5.1',
+      model: 'glm-5-turbo',
       rendering: {
         mode: 'triage',
         selectedFiles: 8,
         reviewableFiles: 34,
         selectedChanges: 620,
         reviewableChanges: 2140,
+        packetIncludedFiles: 6,
+        packetTotalFiles: 8,
+        packetOmittedFiles: 2,
         maxTurns: 6,
         timeoutMinutes: 5,
       },
     });
 
     expect(markdown).toContain(
-      '> 🧭 Review context: mode `triage`; hotspot-based bounded review (non-exhaustive); scope 8/34 reviewable files; 620/2140 reviewable changed lines; turn budget 6 turns; workflow cap 5 minutes.'
+      '> 🧭 `triage` • 8/34 files • 620/2140 lines • packet 6/8 • 6 turns / 5 minutes'
     );
     expect(markdown).toContain('**⚠️ APPROVED WITH NOTES**');
+  });
+
+  test('auto-formats code-like tokens while keeping markdown structure renderer-owned', () => {
+    const validation = reviewOutput.normalizeStructuredOutput(
+      JSON.stringify({
+        summary:
+          'buildReviewScope(files, mode) now feeds .github/workflows/ai-review.yml through workflow_dispatch with AI_REVIEW_PACKET_FILE and --max-turns coverage.',
+        findings: [
+          {
+            severity: 'medium',
+            title: 'pull_request_target fallback still references old_marker_path',
+            file: '.github/workflows/ai-review.yml',
+            line: 181,
+            what: 'The workflow_dispatch smoke test still leaves old_marker_path in one branch.',
+            why: 'That makes pull_request_target reruns harder to reason about for maintainers.',
+            fix: 'Rename old_marker_path and keep workflow_dispatch aligned with AI_REVIEW_PACKET_FILE.',
+          },
+        ],
+        securityChecklist: [
+          {
+            check: 'workflow_dispatch safety',
+            status: 'pass',
+            notes: 'workflow_dispatch stays scoped to .github/workflows/ai-review.yml only.',
+          },
+        ],
+        ccsCompliance: [
+          {
+            rule: 'Renderer-owned markdown',
+            status: 'pass',
+            notes: 'The normalizer still owns headings, tables, and code fences.',
+          },
+        ],
+        informational: ['Use --max-turns only for legacy fallbacks.'],
+        strengths: ['AI_REVIEW_PACKET_FILE now renders as code.'],
+        overallAssessment: 'approved_with_notes',
+        overallRationale:
+          'The renderer can format buildReviewScope(files, mode) and .github/workflows/ai-review.yml safely.',
+      })
+    );
+
+    expect(validation.ok).toBe(true);
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
+
+    expect(markdown).toContain('`buildReviewScope(files, mode)`');
+    expect(markdown).toContain('`.github/workflows/ai-review.yml`');
+    expect(markdown).toContain('`workflow_dispatch`');
+    expect(markdown).toContain('`AI_REVIEW_PACKET_FILE`');
+    expect(markdown).toContain('`--max-turns`');
+    expect(markdown).toContain('`pull_request_target`');
+    expect(markdown).toContain('`old_marker_path`');
+  });
+
+  test('renders finding snippets as renderer-owned fenced code blocks', () => {
+    const validation = reviewOutput.normalizeStructuredOutput(
+      JSON.stringify({
+        summary: 'One workflow branch still uses the stale marker path.',
+        findings: [
+          {
+            severity: 'medium',
+            title: 'Fallback branch still writes the stale marker file',
+            file: '.github/workflows/ai-review.yml',
+            line: 181,
+            what: 'One branch still writes the old marker file path.',
+            why: 'That can leave duplicate bot comments on reruns for the same PR SHA.',
+            fix: 'Keep the rerun marker keyed to PR plus head SHA in every publish branch.',
+            snippets: [
+              {
+                label: 'Current publish branch',
+                language: 'bash',
+                code: 'marker_file=\"$RUNNER_TEMP/.ai-review-marker\"\nprintf \"%s\\n\" \"$REVIEW_MARKER\" > \"$marker_file\"',
+              },
+            ],
+          },
+        ],
+        securityChecklist: [{ check: 'Workflow safety', status: 'pass', notes: 'Covered.' }],
+        ccsCompliance: [{ rule: 'Renderer-owned markdown', status: 'pass', notes: 'Covered.' }],
+        informational: [],
+        strengths: [],
+        overallAssessment: 'approved_with_notes',
+        overallRationale: 'This is a deterministic formatting-only follow-up.',
+      })
+    );
+
+    expect(validation.ok).toBe(true);
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
+
+    expect(markdown).toContain('Evidence: Current publish branch');
+    expect(markdown).toContain('```bash');
+    expect(markdown).toContain('marker_file="$RUNNER_TEMP/.ai-review-marker"');
+    expect(markdown).toContain('printf "%s\\n" "$REVIEW_MARKER" > "$marker_file"');
+    expect(markdown).toContain('```');
+  });
+
+  test('renders finding evidence as a standalone block after the fix bullet in markdown', async () => {
+    const validation = reviewOutput.normalizeStructuredOutput(
+      JSON.stringify({
+        summary: 'One non-blocking follow-up remains.',
+        findings: [
+          {
+            severity: 'low',
+            title: 'Marker write path still has one stale branch',
+            file: '.github/workflows/ai-review.yml',
+            line: 181,
+            what: 'One branch still writes the stale marker file path.',
+            why: 'That can make rerun behavior harder to reason about.',
+            fix: 'Keep every publish branch aligned on the PR plus SHA marker.',
+            snippets: [
+              {
+                label: 'Current branch body',
+                language: 'bash',
+                code: 'marker_file="$RUNNER_TEMP/.ai-review-marker"\nprintf "%s\\n" "$REVIEW_MARKER" > "$marker_file"',
+              },
+            ],
+          },
+        ],
+        securityChecklist: [{ check: 'Injection safety', status: 'pass', notes: 'Covered.' }],
+        ccsCompliance: [{ rule: 'Renderer-owned markdown', status: 'pass', notes: 'Covered.' }],
+        informational: [],
+        strengths: [],
+        overallAssessment: 'approved_with_notes',
+        overallRationale: 'The remaining change is formatter polish only.',
+      })
+    );
+
+    expect(validation.ok).toBe(true);
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
+    const html = await marked.parse(markdown);
+
+    expect(html).toContain('<li>Fix: Keep every publish branch aligned on the PR plus SHA marker.</li>');
+    expect(html).toContain('<p>Evidence: Current branch body</p>');
+    expect(html).toContain('<pre><code class="language-bash">');
+    expect(html).not.toContain('Fix: Keep every publish branch aligned on the PR plus SHA marker.\nEvidence:');
+  });
+
+  test('preserves leading indentation inside literal finding snippets', () => {
+    const validation = reviewOutput.normalizeStructuredOutput(
+      JSON.stringify({
+        summary: 'Indented snippets must stay literal.',
+        findings: [
+          {
+            severity: 'low',
+            title: 'Indentation-sensitive example',
+            file: 'examples/sample.py',
+            line: 7,
+            what: 'The snippet must preserve its leading spaces.',
+            why: 'Python, YAML, and shell examples break when the renderer trims indentation.',
+            fix: 'Normalize newlines without trimming leading spaces from the first line.',
+            snippets: [
+              {
+                language: 'python',
+                code: '    if value:\n        print(value)',
+              },
+            ],
+          },
+        ],
+        securityChecklist: [{ check: 'Injection safety', status: 'pass', notes: 'Covered.' }],
+        ccsCompliance: [{ rule: 'Renderer-owned markdown', status: 'pass', notes: 'Covered.' }],
+        informational: [],
+        strengths: [],
+        overallAssessment: 'approved_with_notes',
+        overallRationale: 'This keeps literal evidence stable.',
+      })
+    );
+
+    expect(validation.ok).toBe(true);
+    expect(validation.value.findings[0].snippets[0].code).toBe('    if value:\n        print(value)');
+
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
+    expect(markdown).toContain('    if value:');
+    expect(markdown).toContain('        print(value)');
   });
 
   test('normalizes optional rendering metadata when present in structured output', () => {
@@ -168,12 +344,15 @@ describe('normalize-ai-review-output', () => {
 
       const result = reviewOutput.writeReviewFromEnv({
         AI_REVIEW_EXECUTION_FILE: executionFile,
-        AI_REVIEW_MODEL: 'glm-5.1',
+        AI_REVIEW_MODEL: 'glm-5-turbo',
         AI_REVIEW_MODE: 'triage',
         AI_REVIEW_SELECTED_FILES: '10',
         AI_REVIEW_REVIEWABLE_FILES: '46',
         AI_REVIEW_SELECTED_CHANGES: '700',
         AI_REVIEW_REVIEWABLE_CHANGES: '2310',
+        AI_REVIEW_PACKET_INCLUDED_FILES: '7',
+        AI_REVIEW_PACKET_TOTAL_FILES: '10',
+        AI_REVIEW_PACKET_OMITTED_FILES: '3',
         AI_REVIEW_MAX_TURNS: '25',
         AI_REVIEW_TIMEOUT_MINUTES: '5',
         AI_REVIEW_OUTPUT_FILE: outputFile,
@@ -189,14 +368,17 @@ describe('normalize-ai-review-output', () => {
       expect(markdown).toContain(
         'The `triage` review reached its 25-turn runtime budget before it produced validated structured output.'
       );
-      expect(markdown).toContain('- Review mode: `triage` (hotspot-based bounded review (non-exhaustive))');
+      expect(markdown).toContain('- Review mode: `triage` (expanded packaged review with broader coverage)');
       expect(markdown).toContain('- Review scope: 10/46 reviewable files; 700/2310 reviewable changed lines');
+      expect(markdown).toContain(
+        '- Packet coverage: 7/10 selected files included in the final review packet; 3 selected files omitted for packet budget'
+      );
       expect(markdown).toContain('- Runtime budget: 25 turns / 5 minutes');
       expect(markdown).toContain(
         '- Hotspot files in this pass: `.github/workflows/ai-review.yml`, `scripts/github/prepare-ai-review-scope.mjs`, `src/ccs.ts`'
       );
-      expect(markdown).toContain('- Remaining reviewable scope not fully covered: 36 files; 1610 changed lines');
-      expect(markdown).toContain('- Manual follow-up: Focus manual review on the hotspot files above');
+      expect(markdown).toContain('- Remaining reviewable scope not fully covered: 39 files');
+      expect(markdown).toContain('- Manual follow-up: Focus manual review on the selected files above');
       expect(markdown).toContain('Runtime tools: `Bash`, `Edit`, `Read`');
       expect(markdown).toContain('Turns used: 25');
       expect(markdown).not.toContain('Now let me verify the findings');
@@ -225,12 +407,15 @@ describe('normalize-ai-review-output', () => {
 
       const result = reviewOutput.writeReviewFromEnv({
         AI_REVIEW_EXECUTION_FILE: executionFile,
-        AI_REVIEW_MODEL: 'glm-5.1',
+        AI_REVIEW_MODEL: 'glm-5-turbo',
         AI_REVIEW_MODE: 'fast',
         AI_REVIEW_SELECTED_FILES: '6',
         AI_REVIEW_REVIEWABLE_FILES: '52',
         AI_REVIEW_SELECTED_CHANGES: '640',
         AI_REVIEW_REVIEWABLE_CHANGES: '2480',
+        AI_REVIEW_PACKET_INCLUDED_FILES: '5',
+        AI_REVIEW_PACKET_TOTAL_FILES: '6',
+        AI_REVIEW_PACKET_OMITTED_FILES: '1',
         AI_REVIEW_MAX_TURNS: '5',
         AI_REVIEW_TIMEOUT_MINUTES: '5',
         AI_REVIEW_STATUS: 'cancelled',
@@ -246,13 +431,16 @@ describe('normalize-ai-review-output', () => {
       expect(markdown).toContain(
         'The `fast` review hit the workflow runtime cap before it produced validated structured output. The run stayed bounded to 5 minutes.'
       );
-      expect(markdown).toContain('- Review mode: `fast` (diff-focused bounded review)');
+      expect(markdown).toContain('- Review mode: `fast` (selected-file packaged review)');
       expect(markdown).toContain('- Review scope: 6/52 reviewable files; 640/2480 reviewable changed lines');
+      expect(markdown).toContain(
+        '- Packet coverage: 5/6 selected files included in the final review packet; 1 selected file omitted for packet budget'
+      );
       expect(markdown).toContain('- Runtime budget: 5 turns / 5 minutes');
       expect(markdown).toContain(
         '- Hotspot files in this pass: `src/commands/help-command.ts`, `src/ccs.ts`'
       );
-      expect(markdown).toContain('- Remaining reviewable scope not fully covered: 46 files; 1840 changed lines');
+      expect(markdown).toContain('- Remaining reviewable scope not fully covered: 47 files');
       expect(markdown).not.toContain('Partial draft that should never reach the published markdown.');
     });
   });
@@ -266,7 +454,7 @@ describe('normalize-ai-review-output', () => {
 
       const result = reviewOutput.writeReviewFromEnv({
         AI_REVIEW_EXECUTION_FILE: executionFile,
-        AI_REVIEW_MODEL: 'glm-5.1',
+        AI_REVIEW_MODEL: 'glm-5-turbo',
         AI_REVIEW_OUTPUT_FILE: outputFile,
         AI_REVIEW_RUN_URL: 'https://github.com/kaitranntt/ccs/actions/runs/1',
         AI_REVIEW_STRUCTURED_OUTPUT: JSON.stringify({
@@ -307,10 +495,11 @@ describe('normalize-ai-review-output', () => {
 
       const markdown = fs.readFileSync(outputFile, 'utf8');
       expect(markdown).toContain('Summary with \\`code\\` and ## heading markers.');
-      expect(markdown).toContain('**`src/example.ts:9` — Title with \\`ticks\\`**');
+      expect(markdown).toContain('#### 1. Title with \\`ticks\\`');
+      expect(markdown).toContain('- Location: `src/example.ts:9`');
       expect(markdown).toContain('Problem: Problem text uses \\*\\*bold\\*\\* markers.');
-      expect(markdown).toContain('Why it matters: Why text uses \\[link\\] syntax.');
-      expect(markdown).toContain('Suggested fix: Fix text uses \\<html\\> markers.');
+      expect(markdown).toContain('Impact: Why text uses \\[link\\] syntax.');
+      expect(markdown).toContain('Fix: Fix text uses \\<html\\> markers.');
       expect(markdown).toContain('Notes with a pipe \\| still render safely in table cells.');
       expect(markdown).toContain('- Informational item with \\`inline code\\`.');
       expect(markdown).toContain('- Strength with \\*\\*bold\\*\\* markers.');
@@ -363,17 +552,77 @@ describe('normalize-ai-review-output', () => {
     );
 
     expect(validation.ok).toBe(true);
-    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5.1' });
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
 
-    expect(markdown).toContain('### 🔍 Findings');
+    expect(markdown).toContain('### Top Findings');
     expect(markdown).toContain('No confirmed issues found after reviewing the diff and surrounding code.');
-    expect(markdown).toContain('### 🔒 Security Checklist');
+    expect(markdown).toContain('### Security Checklist (1)');
     expect(markdown).toContain(
       '| Injection safety | ✅ | No user-controlled data crosses a risky boundary in the reviewed diff. |'
     );
-    expect(markdown).toContain('### 📊 CCS Compliance');
+    expect(markdown).toContain('### CCS Compliance (1)');
     expect(markdown).toContain('| Help/docs alignment | N/A | No CLI behavior changed, so there was nothing to update. |');
     expect(markdown).toContain('**✅ APPROVED** — No confirmed regressions or missing verification remain.');
+  });
+
+  test('summarizes overflow findings in top findings when the detail list is longer than the summary limit', () => {
+    const validation = reviewOutput.normalizeStructuredOutput(
+      JSON.stringify({
+        summary: 'Several follow-ups remain.',
+        findings: [
+          {
+            severity: 'high',
+            title: 'High severity finding',
+            file: 'src/high.ts',
+            line: 10,
+            what: 'High severity problem.',
+            why: 'High severity impact.',
+            fix: 'High severity fix.',
+          },
+          {
+            severity: 'medium',
+            title: 'First medium finding',
+            file: 'src/medium-a.ts',
+            line: 20,
+            what: 'Medium severity problem A.',
+            why: 'Medium severity impact A.',
+            fix: 'Medium severity fix A.',
+          },
+          {
+            severity: 'medium',
+            title: 'Second medium finding',
+            file: 'src/medium-b.ts',
+            line: 30,
+            what: 'Medium severity problem B.',
+            why: 'Medium severity impact B.',
+            fix: 'Medium severity fix B.',
+          },
+          {
+            severity: 'low',
+            title: 'Low severity finding',
+            file: 'src/low.ts',
+            line: 40,
+            what: 'Low severity problem.',
+            why: 'Low severity impact.',
+            fix: 'Low severity fix.',
+          },
+        ],
+        securityChecklist: [{ check: 'Injection safety', status: 'pass', notes: 'Covered.' }],
+        ccsCompliance: [{ rule: 'Renderer-owned markdown', status: 'pass', notes: 'Covered.' }],
+        informational: [],
+        strengths: [],
+        overallAssessment: 'changes_requested',
+        overallRationale: 'Multiple findings remain before merge.',
+      })
+    );
+
+    expect(validation.ok).toBe(true);
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
+
+    expect(markdown).toContain('- 🔴 High `src/high.ts:10` — High severity finding');
+    expect(markdown).toContain('- 🟡 Medium `src/medium-a.ts:20` — First medium finding');
+    expect(markdown).toContain('- 🟡 Medium `src/medium-b.ts:30` — Second medium finding');
+    expect(markdown).toContain('- 1 more finding in the details below.');
   });
 
   test('renders findings without line numbers using the file path only', () => {
@@ -401,11 +650,10 @@ describe('normalize-ai-review-output', () => {
     );
 
     expect(validation.ok).toBe(true);
-    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5.1' });
+    const markdown = reviewOutput.renderStructuredReview(validation.value, { model: 'glm-5-turbo' });
 
-    expect(markdown).toContain(
-      '**`tests/unit/scripts/github/normalize-ai-review-output.test.ts` — Missing empty-state coverage**'
-    );
+    expect(markdown).toContain('#### 1. Missing empty-state coverage');
+    expect(markdown).toContain('- Location: `tests/unit/scripts/github/normalize-ai-review-output.test.ts`');
     expect(markdown).not.toContain('normalize-ai-review-output.test.ts:`');
   });
 
@@ -431,10 +679,10 @@ describe('normalize-ai-review-output', () => {
         overallAssessment: 'approved_with_notes',
         overallRationale: 'This is a formatting-only follow-up.',
       },
-      { model: 'glm-5.1' }
+      { model: 'glm-5-turbo' }
     );
 
-    expect(markdown).toContain('**``src/weird`path.ts`` — Backtick-safe locations stay readable**');
+    expect(markdown).toContain('- Location: ``src/weird`path.ts``');
   });
 
   test('rejects empty checklist sections instead of synthesizing placeholder rows', () => {
@@ -453,6 +701,41 @@ describe('normalize-ai-review-output', () => {
 
     expect(validation.ok).toBe(false);
     expect(validation.reason).toContain('securityChecklist must contain at least 1 item');
+  });
+
+  test('rejects finding snippets that exceed the renderer snippet budget', () => {
+    const validation = reviewOutput.normalizeStructuredOutput(
+      JSON.stringify({
+        summary: 'The renderer should reject oversized snippet payloads.',
+        findings: [
+          {
+            severity: 'low',
+            title: 'Oversized snippet',
+            file: 'scripts/github/normalize-ai-review-output.mjs',
+            line: 1,
+            what: 'The example snippet is intentionally too long.',
+            why: 'Oversized snippets would bloat the published review comment.',
+            fix: 'Keep snippets short and renderer-owned.',
+            snippets: [
+              {
+                label: 'Too long',
+                language: 'txt',
+                code: Array.from({ length: 21 }, (_, index) => `line ${index + 1}`).join('\n'),
+              },
+            ],
+          },
+        ],
+        securityChecklist: [{ check: 'Injection safety', status: 'pass', notes: 'Covered.' }],
+        ccsCompliance: [{ rule: 'Renderer-owned markdown', status: 'pass', notes: 'Covered.' }],
+        informational: [],
+        strengths: [],
+        overallAssessment: 'approved_with_notes',
+        overallRationale: 'Oversized snippets should fail validation.',
+      })
+    );
+
+    expect(validation.ok).toBe(false);
+    expect(validation.reason).toContain('findings[0].snippets[0].code exceeds 20 lines');
   });
 
   test('allows plain prose that references section labels without starting with them', () => {
