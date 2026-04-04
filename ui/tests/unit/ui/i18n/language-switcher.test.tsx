@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, userEvent, waitFor } from '@tests/setup/test-utils';
 import i18n from '@/lib/i18n';
-import { ContinuityReadinessCard } from '@/components/account/continuity-readiness-card';
+import { ContinuityOverview } from '@/components/account/continuity-overview';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
-import { HistorySyncLearningMap } from '@/components/account/history-sync-learning-map';
 import { TabNavigation } from '@/pages/settings/components/tab-navigation';
 import {
   getInitialLocale,
@@ -138,97 +137,50 @@ describe('Dashboard i18n', () => {
     expect(screen.getByText('思考')).toBeInTheDocument();
   });
 
-  it('renders Japanese history sync guidance without fallback English copy', async () => {
-    await i18n.changeLanguage('ja');
-
-    render(
-      <HistorySyncLearningMap
-        isolatedCount={1}
-        sharedStandardCount={2}
-        deeperSharedCount={3}
-        sharedGroups={['default']}
-        sharedPeerGroups={['default']}
-        deeperReadyGroups={['default']}
-        legacyTargetCount={2}
-        cliproxyCount={1}
-      />
-    );
-
-    expect(screen.getByText('履歴同期の仕組み')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'グループ「default」は良い状態ですが、他のアカウントやグループでは同グループ設定や拡張継続性がまだ不足しています。'
-      )
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('1 件の CLIProxy Claude Pool アカウントは、CLIProxy ページで管理します。')
-    ).toBeInTheDocument();
-
-    await userEvent.click(
-      screen.getByRole('button', { name: '詳細を表示: グループ、切り替え、レガシーポリシー' })
-    );
-
-    expect(
-      screen.getByText('2 件のレガシーアカウントで明示的な確認がまだ必要です。')
-    ).toBeInTheDocument();
-  });
-
-  it('renders Japanese continuity readiness card without fallback English copy', async () => {
-    await i18n.changeLanguage('ja');
-
-    render(
-      <ContinuityReadinessCard
-        totalAccounts={2}
-        isolatedCount={2}
-        sharedAloneCount={0}
-        sharedPeerAccountCount={0}
-        deeperReadyAccountCount={0}
-        sharedPeerGroups={[]}
-        deeperReadyGroups={[]}
-      />
-    );
-
-    expect(screen.getByText('アカウント間再開チェック')).toBeInTheDocument();
-    expect(screen.getByText('現在、アカウント間再開はオフです。')).toBeInTheDocument();
-  });
-
-  it('uses single-account-specific next steps in the readiness card', async () => {
+  it('uses single-account-specific next steps in the continuity overview', async () => {
     await i18n.changeLanguage('en');
 
     render(
-      <ContinuityReadinessCard
+      <ContinuityOverview
         totalAccounts={1}
         isolatedCount={1}
+        sharedStandardCount={0}
+        deeperSharedCount={0}
         sharedAloneCount={0}
         sharedPeerAccountCount={0}
         deeperReadyAccountCount={0}
+        sharedGroups={[]}
         sharedPeerGroups={[]}
         deeperReadyGroups={[]}
+        legacyTargetCount={0}
+        cliproxyCount={0}
       />
     );
 
     expect(
       screen.getByText(
-        'Create a second ccs auth account before planning any cross-account handoff.'
+        'Cross-account handoff does not apply yet. Add another auth account before configuring shared continuity.'
       )
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText('Open Sync on both accounts, not just the one you are switching into.')
-    ).not.toBeInTheDocument();
   });
 
   it('pluralizes the shared-alone readiness copy', async () => {
     await i18n.changeLanguage('en');
 
     render(
-      <ContinuityReadinessCard
+      <ContinuityOverview
         totalAccounts={3}
         isolatedCount={1}
+        sharedStandardCount={2}
+        deeperSharedCount={0}
         sharedAloneCount={2}
         sharedPeerAccountCount={0}
         deeperReadyAccountCount={0}
+        sharedGroups={[]}
         sharedPeerGroups={[]}
         deeperReadyGroups={[]}
+        legacyTargetCount={0}
+        cliproxyCount={0}
       />
     );
 
@@ -237,9 +189,9 @@ describe('Dashboard i18n', () => {
     ).toBeInTheDocument();
   });
 
-  it.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))(
+  it.each(SUPPORTED_LOCALES.filter((locale: string) => locale !== 'en'))(
     'keeps %s translation keys in parity with en and preserves placeholders',
-    (locale) => {
+    (locale: string) => {
       const resources = i18n.options.resources as
         | Record<string, { translation: Record<string, unknown> }>
         | undefined;

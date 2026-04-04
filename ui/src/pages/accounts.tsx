@@ -5,19 +5,16 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, ChevronDown, Plus, Users, Zap } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Plus, Users, Zap } from 'lucide-react';
 import { AccountsTable } from '@/components/account/accounts-table';
-import { ContinuityReadinessCard } from '@/components/account/continuity-readiness-card';
+import { ContinuityOverview } from '@/components/account/continuity-overview';
 import { CreateAuthProfileDialog } from '@/components/account/create-auth-profile-dialog';
-import { HistorySyncLearningMap } from '@/components/account/history-sync-learning-map';
 import { CopyButton } from '@/components/ui/copy-button';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAccounts, useConfirmLegacyAccountPolicies } from '@/hooks/use-accounts';
-import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
 export function AccountsPage() {
@@ -26,7 +23,6 @@ export function AccountsPage() {
   const { data, isLoading } = useAccounts();
   const confirmLegacyMutation = useConfirmLegacyAccountPolicies();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
 
   const authAccounts = data?.accounts || [];
   const cliproxyCount = data?.cliproxyCount || 0;
@@ -146,50 +142,6 @@ export function AccountsPage() {
                 </div>
               )}
 
-              <Collapsible open={guideOpen} onOpenChange={setGuideOpen}>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" className="h-auto w-full justify-between px-0 py-0">
-                        <div className="text-left">
-                          <CardTitle className="text-sm">
-                            {t('accountsPage.continuityGuide')}
-                          </CardTitle>
-                          <CardDescription className="mt-1">
-                            {t('accountsPage.expandWhenNeeded')}
-                          </CardDescription>
-                        </div>
-                        <ChevronDown
-                          className={cn('h-4 w-4 transition-transform', guideOpen && 'rotate-180')}
-                        />
-                      </Button>
-                    </CollapsibleTrigger>
-                  </CardHeader>
-                  <CollapsibleContent>
-                    <CardContent className="space-y-3 text-xs text-muted-foreground">
-                      <div className="rounded-md border p-2.5">
-                        <p className="font-semibold text-foreground">
-                          {t('accountsPage.sharedStandard')}
-                        </p>
-                        <p className="mt-1">{t('accountsPage.sharedStandardDesc')}</p>
-                      </div>
-                      <div className="rounded-md border p-2.5">
-                        <p className="font-semibold text-foreground">
-                          {t('accountsPage.sharedDeeper')}
-                        </p>
-                        <p className="mt-1">{t('accountsPage.sharedDeeperDesc')}</p>
-                      </div>
-                      <div className="rounded-md border p-2.5">
-                        <p className="font-semibold text-foreground">
-                          {t('accountsPage.isolated')}
-                        </p>
-                        <p className="mt-1">{t('accountsPage.isolatedDesc')}</p>
-                      </div>
-                    </CardContent>
-                  </CollapsibleContent>
-                </Card>
-              </Collapsible>
-
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm">{t('accountsPage.quickCommands')}</CardTitle>
@@ -235,20 +187,14 @@ export function AccountsPage() {
           </div>
 
           <div className="flex-1 min-h-0 p-5 space-y-4 overflow-y-auto">
-            <ContinuityReadinessCard
+            <ContinuityOverview
               totalAccounts={authAccounts.length}
-              isolatedCount={isolatedCount}
-              sharedAloneCount={sharedAloneCount}
-              sharedPeerAccountCount={sharedPeerAccountCount}
-              deeperReadyAccountCount={deeperReadyAccountCount}
-              sharedPeerGroups={sharedPeerGroups}
-              deeperReadyGroups={deeperReadyGroups}
-            />
-
-            <HistorySyncLearningMap
               isolatedCount={isolatedCount}
               sharedStandardCount={sharedStandardCount}
               deeperSharedCount={deeperSharedCount}
+              sharedAloneCount={sharedAloneCount}
+              sharedPeerAccountCount={sharedPeerAccountCount}
+              deeperReadyAccountCount={deeperReadyAccountCount}
               sharedGroups={sharedGroups}
               sharedPeerGroups={sharedPeerGroups}
               deeperReadyGroups={deeperReadyGroups}
@@ -316,25 +262,19 @@ export function AccountsPage() {
           </CardContent>
         </Card>
 
-        <HistorySyncLearningMap
+        <ContinuityOverview
+          totalAccounts={authAccounts.length}
           isolatedCount={isolatedCount}
           sharedStandardCount={sharedStandardCount}
           deeperSharedCount={deeperSharedCount}
+          sharedAloneCount={sharedAloneCount}
+          sharedPeerAccountCount={sharedPeerAccountCount}
+          deeperReadyAccountCount={deeperReadyAccountCount}
           sharedGroups={sharedGroups}
           sharedPeerGroups={sharedPeerGroups}
           deeperReadyGroups={deeperReadyGroups}
           legacyTargetCount={legacyTargetCount}
           cliproxyCount={cliproxyCount}
-        />
-
-        <ContinuityReadinessCard
-          totalAccounts={authAccounts.length}
-          isolatedCount={isolatedCount}
-          sharedAloneCount={sharedAloneCount}
-          sharedPeerAccountCount={sharedPeerAccountCount}
-          deeperReadyAccountCount={deeperReadyAccountCount}
-          sharedPeerGroups={sharedPeerGroups}
-          deeperReadyGroups={deeperReadyGroups}
         />
 
         <Card>

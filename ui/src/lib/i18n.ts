@@ -401,12 +401,10 @@ const resources = {
           'Configure how "{{name}}" shares history and continuity with other ccs auth accounts.',
         syncMode: 'Sync Mode',
         selectContextMode: 'Select context mode',
-        isolatedOption: 'isolated (no sync)',
-        sharedOption: 'shared (sync enabled)',
-        sharedModeHint:
-          'Shared mode reuses workspace context for accounts in the same history sync group.',
-        isolatedModeHint:
-          'Isolated mode keeps this account fully separate from other ccs auth accounts.',
+        isolatedOption: 'Isolated',
+        sharedOption: 'Shared',
+        sharedModeHint: 'Reuses workspace context across accounts in the same history group.',
+        isolatedModeHint: 'Keeps this account fully separate from other ccs auth accounts.',
         historySyncGroup: 'History Sync Group',
         groupPlaceholder: 'default',
         groupHint:
@@ -414,10 +412,9 @@ const resources = {
         invalidGroup: 'Enter a valid group name that starts with a letter.',
         continuityDepth: 'Continuity Depth',
         selectContinuityDepth: 'Select continuity depth',
-        standardOption: 'standard (projects only)',
-        deeperOption: 'deeper continuity (advanced)',
-        deeperHint:
-          'Advanced mode also syncs session-env, file-history, shell-snapshots, and todos.',
+        standardOption: 'Standard',
+        deeperOption: 'Deeper',
+        deeperHint: 'Syncs comprehensive session-env, file-history, shell-snapshots, and todos.',
         standardHint: 'Standard mode syncs project workspace context only.',
         credentialsIsolated: 'Credentials and .anthropic remain isolated per account in all modes.',
         implicationTitle: 'What this means after save',

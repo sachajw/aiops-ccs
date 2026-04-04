@@ -10,13 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
+import { Unlink, Link2, Waves, ShieldAlert, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { AuthAccountRow, SharedGroupSummary } from '@/lib/account-continuity';
 import { useUpdateAccountContext } from '@/hooks/use-accounts';
@@ -117,20 +112,47 @@ export function EditAccountContextDialog({
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="context-mode">{t('editAccountContext.syncMode')}</Label>
-            <Select value={mode} onValueChange={(value) => setMode(value as ContextMode)}>
-              <SelectTrigger id="context-mode">
-                <SelectValue placeholder={t('editAccountContext.selectContextMode')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="isolated">{t('editAccountContext.isolatedOption')}</SelectItem>
-                <SelectItem value="shared">{t('editAccountContext.sharedOption')}</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {mode === 'shared'
-                ? t('editAccountContext.sharedModeHint')
-                : t('editAccountContext.isolatedModeHint')}
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold">{t('editAccountContext.syncMode')}</Label>
+            </div>
+            <div
+              className="flex p-0.5 bg-muted/60 hover:bg-muted/80 transition-colors rounded-xl border border-border/40 w-full"
+              role="radiogroup"
+              aria-label={t('editAccountContext.syncMode')}
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={mode === 'isolated'}
+                onClick={() => setMode('isolated')}
+                className={`flex-1 flex justify-center items-center gap-2 px-3 py-1.5 rounded-[10px] text-sm font-medium transition-all duration-200 overflow-hidden ${
+                  mode === 'isolated'
+                    ? 'bg-background text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-border/50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+              >
+                <Unlink className="h-4 w-4 shrink-0" />
+                <span className="truncate">{t('editAccountContext.isolatedOption')}</span>
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={mode === 'shared'}
+                onClick={() => setMode('shared')}
+                className={`flex-1 flex justify-center items-center gap-2 px-3 py-1.5 rounded-[10px] text-sm font-medium transition-all duration-200 overflow-hidden ${
+                  mode === 'shared'
+                    ? 'bg-background text-emerald-600 dark:text-emerald-400 shadow-sm ring-1 ring-border/50'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
+              >
+                <Link2 className="h-4 w-4 shrink-0" />
+                <span className="truncate">{t('editAccountContext.sharedOption')}</span>
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground pt-1 px-1">
+              {mode === 'isolated'
+                ? t('editAccountContext.isolatedModeHint')
+                : t('editAccountContext.sharedModeHint')}
             </p>
           </div>
 
@@ -155,23 +177,49 @@ export function EditAccountContextDialog({
 
           {mode === 'shared' && (
             <div className="space-y-2">
-              <Label htmlFor="continuity-mode">{t('editAccountContext.continuityDepth')}</Label>
-              <Select
-                value={continuityMode}
-                onValueChange={(value) => setContinuityMode(value as ContinuityMode)}
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">
+                  {t('editAccountContext.continuityDepth')}
+                </Label>
+              </div>
+              <div
+                className="flex p-0.5 bg-muted/60 hover:bg-muted/80 transition-colors rounded-xl border border-border/40 w-full"
+                role="radiogroup"
+                aria-label={t('editAccountContext.continuityDepth')}
               >
-                <SelectTrigger id="continuity-mode">
-                  <SelectValue placeholder={t('editAccountContext.selectContinuityDepth')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="standard">{t('editAccountContext.standardOption')}</SelectItem>
-                  <SelectItem value="deeper">{t('editAccountContext.deeperOption')}</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {continuityMode === 'deeper'
-                  ? t('editAccountContext.deeperHint')
-                  : t('editAccountContext.standardHint')}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={continuityMode === 'standard'}
+                  onClick={() => setContinuityMode('standard')}
+                  className={`flex-1 flex justify-center items-center gap-2 px-3 py-1.5 rounded-[10px] text-sm font-medium transition-all duration-200 overflow-hidden ${
+                    continuityMode === 'standard'
+                      ? 'bg-background text-emerald-600 dark:text-emerald-400 shadow-sm ring-1 ring-border/50'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  <Link2 className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{t('editAccountContext.standardOption')}</span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={continuityMode === 'deeper'}
+                  onClick={() => setContinuityMode('deeper')}
+                  className={`flex-1 flex justify-center items-center gap-2 px-3 py-1.5 rounded-[10px] text-sm font-medium transition-all duration-200 overflow-hidden ${
+                    continuityMode === 'deeper'
+                      ? 'bg-background text-indigo-600 dark:text-indigo-400 shadow-sm ring-1 ring-border/50'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  <Waves className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{t('editAccountContext.deeperOption')}</span>
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground pt-1 px-1">
+                {continuityMode === 'standard'
+                  ? t('editAccountContext.standardHint')
+                  : t('editAccountContext.deeperHint')}
               </p>
             </div>
           )}
@@ -180,33 +228,51 @@ export function EditAccountContextDialog({
             {t('editAccountContext.credentialsIsolated')}
           </p>
 
-          <div className="rounded-md border bg-muted/20 p-3 text-xs">
-            <p className="font-medium text-foreground">
-              {t('editAccountContext.implicationTitle')}
-            </p>
-            <div className="mt-2 space-y-1.5 text-muted-foreground">
+          <div
+            className={`rounded-[14px] border p-4 text-xs shadow-sm transition-colors ${mode === 'isolated' ? 'bg-blue-50/50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800/40' : 'bg-muted/40 border-border/60'}`}
+          >
+            <div className="flex items-start gap-3">
               {mode === 'isolated' ? (
-                <p>{t('editAccountContext.isolatedImplication')}</p>
+                <ShieldAlert className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
               ) : (
-                <>
-                  <p>{t('editAccountContext.sameGroupRule', { group: normalizedGroup })}</p>
-                  <p>
-                    {sameGroupPeerCount > 0
-                      ? t('editAccountContext.sameGroupPeerCount', { count: sameGroupPeerCount })
-                      : t('editAccountContext.noSameGroupPeer')}
+                <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              )}
+              <div className="space-y-1.5 flex-1 text-muted-foreground leading-relaxed">
+                {mode === 'isolated' ? (
+                  <p className="text-foreground font-medium selection:bg-blue-200">
+                    {t('editAccountContext.isolatedImplication')}
                   </p>
-                  <p>
-                    {continuityMode === 'deeper'
-                      ? sameGroupDeeperPeerCount > 0
-                        ? t('editAccountContext.deeperReady', {
+                ) : (
+                  <>
+                    <p>
+                      <span className="text-foreground font-medium">
+                        {t('editAccountContext.sameGroupRule', { group: normalizedGroup })}
+                      </span>{' '}
+                      {sameGroupPeerCount > 0
+                        ? t('editAccountContext.sameGroupPeerCount', { count: sameGroupPeerCount })
+                        : t('editAccountContext.noSameGroupPeer')}
+                    </p>
+                    {continuityMode === 'deeper' && (
+                      <p>
+                        {sameGroupDeeperPeerCount > 0 ? (
+                          t('editAccountContext.deeperReady', {
                             count: sameGroupDeeperPeerCount,
                           })
-                        : t('editAccountContext.deeperNeedsPeers')
-                      : t('editAccountContext.standardWarning')}
-                  </p>
-                </>
-              )}
-              <p>{t('editAccountContext.resumeOriginalWarning')}</p>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-500">
+                            {t('editAccountContext.deeperNeedsPeers')}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+                <p
+                  className={`pt-1.5 text-[11px] ${mode === 'isolated' ? 'text-blue-700/70 dark:text-blue-300/60' : 'text-muted-foreground/70'}`}
+                >
+                  {t('editAccountContext.resumeOriginalWarning')}
+                </p>
+              </div>
             </div>
           </div>
         </div>
