@@ -27,6 +27,10 @@ the docs site, but **do not remove the `## Community Projects` section** or the
 `## Star History` section unless the user explicitly asks for those sections to
 be deleted. Treat both as protected README content.
 
+When a contributor adds a useful community integration section to `README.md`,
+prefer preserving the attribution in `## Community Projects` and moving the
+setup substance into a docs page, rather than deleting the contribution.
+
 Outside provider-specific Gemini and Antigravity docs, avoid using `ccs gemini`
 or `ccs agy` as the primary hero example, default starter route, or generic
 workflow example. Prefer `ccs`, `ccs codex`, `ccs kiro`, `ccs glm`, Droid
