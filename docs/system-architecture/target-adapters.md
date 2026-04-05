@@ -248,7 +248,7 @@ export WEBSEARCH_HOOK_ENV=...  # Image analysis, websearch
 
 ```bash
 # Direct invocation
-ccs gemini
+ccs codex
 → claude "args..."
   with ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN set
 
@@ -368,8 +368,8 @@ export class DroidAdapter implements TargetAdapter {
 
 ```bash
 # Direct invocation
-ccs gemini
-→ droid -m custom:ccs-gemini "args..."
+ccs codex
+→ droid -m custom:ccs-codex "args..."
   (credentials loaded from ~/.factory/settings.json)
 
 # With --target override

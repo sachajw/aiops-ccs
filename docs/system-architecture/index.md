@@ -8,7 +8,7 @@ High-level architecture overview for the CCS (Claude Code Switch) system.
 
 ## System Overview
 
-CCS is a CLI wrapper that enables seamless switching between multiple Claude accounts and alternative AI providers (GLM, Gemini, Codex, Kiro, GitHub Copilot, OpenRouter, Qwen, Kimi, DeepSeek). It now supports multiple CLI targets (Claude Code, Factory Droid, Codex CLI) for credential delivery.
+CCS is a multi-provider profile and runtime manager that enables seamless switching between multiple Claude accounts, alternative AI providers, and multiple CLI targets (Claude Code, Factory Droid, Codex CLI) for credential delivery.
 
 The system consists of two main components:
 

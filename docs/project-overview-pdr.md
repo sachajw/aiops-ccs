@@ -6,9 +6,9 @@ Last Updated: 2026-04-02
 
 **Product Name**: CCS (Claude Code Switch)
 
-**Tagline**: The universal AI profile manager for Claude Code
+**Tagline**: The multi-provider profile and runtime manager for Claude Code and compatible CLIs
 
-**Description**: CLI wrapper enabling seamless switching between multiple Claude accounts and alternative AI providers (GLM, Gemini, Codex, OpenRouter, Qwen, Kimi, DeepSeek) with a React-based dashboard for configuration management. Supports both local and remote CLIProxyAPI instances, hybrid quota management, and official Claude channel runtime setup for Telegram, Discord, and iMessage.
+**Description**: Multi-provider CLI/runtime manager enabling seamless switching between multiple Claude accounts, OAuth/API providers, and alternate targets such as Claude Code, Factory Droid, and Codex CLI. Includes a React-based dashboard for configuration management, plus support for local and remote CLIProxyAPI instances, hybrid quota management, and official Claude channel runtime setup for Telegram, Discord, and iMessage.
 
 **Current Version**: v7.34.x+ (First-class ImageAnalysis MCP tooling, WebSearch MCP, performance improvements)
 

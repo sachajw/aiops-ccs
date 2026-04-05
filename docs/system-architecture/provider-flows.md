@@ -338,7 +338,7 @@ function selectBestAccount(accounts: AccountInfo[]): AccountInfo | null {
 |              OAuth - Authorization Code Flow (Port-based)                 |
 +===========================================================================+
 
-  1. User runs: ccs gemini
+  1. User runs: ccs codex
         |
         v
   2. Check token cache (~/.ccs/cliproxy/auth/)
