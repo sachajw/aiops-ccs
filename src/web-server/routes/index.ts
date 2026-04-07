@@ -6,6 +6,7 @@
  */
 
 import { Router } from 'express';
+import { requireLocalAccessWhenAuthDisabled } from '../middleware/auth-middleware';
 
 // Import domain routers
 import profileRoutes from './profile-routes';
@@ -35,6 +36,30 @@ import claudeExtensionRoutes from './claude-extension-routes';
 
 // Create the main API router
 export const apiRoutes = Router();
+
+const REMOTE_WRITE_ACCESS_ERROR =
+  'Remote dashboard writes require localhost access when dashboard auth is disabled.';
+
+function isMutationMethod(method: string): boolean {
+  const normalized = method.toUpperCase();
+  return (
+    normalized === 'POST' ||
+    normalized === 'PUT' ||
+    normalized === 'PATCH' ||
+    normalized === 'DELETE'
+  );
+}
+
+apiRoutes.use((req, res, next) => {
+  if (!isMutationMethod(req.method)) {
+    next();
+    return;
+  }
+
+  if (requireLocalAccessWhenAuthDisabled(req, res, REMOTE_WRITE_ACCESS_ERROR)) {
+    next();
+  }
+});
 
 // ==================== Profile & Settings ====================
 // Profile CRUD, settings management, presets, accounts

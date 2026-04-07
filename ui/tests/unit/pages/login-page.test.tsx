@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import i18n from '@/lib/i18n';
 import { LoginPage } from '@/pages/login';
-import { render, screen, userEvent } from '@tests/setup/test-utils';
+import { render, screen, userEvent, waitFor } from '@tests/setup/test-utils';
 
 const { navigateMock, useAuthMock } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
@@ -40,13 +40,13 @@ describe('LoginPage', () => {
     await i18n.changeLanguage('en');
   });
 
-  it('renders a setup state for remote access when dashboard auth is unavailable', () => {
+  it('redirects away when dashboard auth is disabled for remote access', async () => {
     useAuthMock.mockReturnValue({
-      authRequired: true,
+      authRequired: false,
       isAuthenticated: false,
       username: null,
       loading: false,
-      accessMode: 'setup',
+      accessMode: 'open',
       authEnabled: false,
       authConfigured: false,
       isLocalAccess: false,
@@ -56,11 +56,10 @@ describe('LoginPage', () => {
 
     render(<LoginPage />);
 
-    expect(screen.getByRole('heading', { name: 'Remote access needs host setup' })).toBeVisible();
-    expect(screen.getByText('ccs config auth setup')).toBeVisible();
-    expect(screen.getByText('No default credentials ship with CCS.')).toBeVisible();
-    expect(screen.queryByLabelText('Username')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Sign In' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(navigateMock).toHaveBeenCalledWith('/settings', { replace: true });
+    });
+    expect(screen.queryByRole('heading', { name: 'Remote access needs host setup' })).toBeNull();
   });
 
   it('renders the incomplete setup copy when auth is enabled without credentials', () => {
