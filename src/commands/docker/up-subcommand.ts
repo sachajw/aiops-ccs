@@ -40,7 +40,7 @@ export async function handleUp(args: string[]): Promise<void> {
     if (parsed.host) {
       console.log(
         info(
-          'Remote access requires dashboard auth. Run inside the container:\n  docker exec -it ccs-cliproxy ccs config auth setup'
+          'Full remote management requires dashboard auth. Without it, remote access stays read-only.\nRun inside the container:\n  docker exec -it ccs-cliproxy ccs config auth setup'
         )
       );
     }

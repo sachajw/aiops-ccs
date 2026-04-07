@@ -42,7 +42,17 @@ export function resolveDashboardAccessState(
   const isLocalAccess = isLoopbackRemoteAddress(remoteAddress);
   const authConfigured = Boolean(authConfig.username && authConfig.password_hash);
 
-  if (authConfig.enabled && authConfigured) {
+  if (!authConfig.enabled) {
+    return {
+      authRequired: false,
+      authEnabled: false,
+      authConfigured,
+      isLocalAccess,
+      accessMode: 'open',
+    };
+  }
+
+  if (authConfigured) {
     return {
       authRequired: true,
       authEnabled: true,
@@ -52,19 +62,9 @@ export function resolveDashboardAccessState(
     };
   }
 
-  if (!authConfig.enabled && isLocalAccess) {
-    return {
-      authRequired: false,
-      authEnabled: false,
-      authConfigured,
-      isLocalAccess: true,
-      accessMode: 'open',
-    };
-  }
-
   return {
     authRequired: true,
-    authEnabled: authConfig.enabled,
+    authEnabled: true,
     authConfigured,
     isLocalAccess,
     accessMode: 'setup',

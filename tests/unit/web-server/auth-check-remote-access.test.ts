@@ -54,18 +54,18 @@ describe('resolveDashboardAccessState', () => {
     });
   });
 
-  it('shows setup state for remote access when auth is disabled', () => {
+  it('keeps remote access open when auth is disabled', () => {
     expect(
       resolveDashboardAccessState(
         { enabled: false, username: '', password_hash: '', session_timeout_hours: 24 },
         '192.168.2.100'
       )
     ).toEqual({
-      authRequired: true,
+      authRequired: false,
       authEnabled: false,
       authConfigured: false,
       isLocalAccess: false,
-      accessMode: 'setup',
+      accessMode: 'open',
     });
   });
 
