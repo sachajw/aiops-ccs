@@ -62,7 +62,7 @@ type TokenCandidate = {
   fingerprint: string;
 };
 
-type RawTokenCandidate = Omit<TokenCandidate, 'accountId' | 'fingerprint'>;
+type RawTokenCandidate = Omit<TokenCandidate, 'accountId' | 'fingerprint'> & { content: string };
 
 function buildTokenFingerprint(content: string): string {
   return createHash('sha256').update(content).digest('hex');
@@ -92,6 +92,7 @@ function listTokenCandidates(provider: CLIProxyProvider, tokenDir: string): Toke
       {
         file,
         filePath,
+        content,
         email,
         projectId,
         mtimeMs: stats.mtimeMs,
@@ -122,7 +123,6 @@ function listTokenCandidates(provider: CLIProxyProvider, tokenDir: string): Toke
 
   return rawCandidates
     .map((rawCandidate) => {
-      const content = fs.readFileSync(rawCandidate.filePath, 'utf-8');
       const duplicateEmailCount = rawCandidate.email
         ? (duplicateEmailCounts.get(rawCandidate.email.toLowerCase()) ?? 1)
         : 1;
@@ -138,7 +138,7 @@ function listTokenCandidates(provider: CLIProxyProvider, tokenDir: string): Toke
       return {
         ...rawCandidate,
         accountId,
-        fingerprint: buildTokenFingerprint(content),
+        fingerprint: buildTokenFingerprint(rawCandidate.content),
       };
     })
     .sort((left, right) => right.mtimeMs - left.mtimeMs);

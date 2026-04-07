@@ -10,7 +10,7 @@ import {
 } from '../../../src/cliproxy/auth/oauth-process';
 
 describe('oauth-process stderr parsing', () => {
-  it('ignores non-ghcp providers', () => {
+  it('does not match provider-specific patterns for other providers', () => {
     const stderr =
       'time="2026-03-03T10:00:00Z" level=error msg="GitHub Copilot authentication failed: example"';
 
@@ -55,8 +55,8 @@ describe('oauth-process successful exit analysis', () => {
   it('treats unchanged existing kiro tokens as a failed add-account attempt', () => {
     const result = analyzeSuccessfulAuthExit({
       provider: 'kiro',
-      knownTokenFiles: [{ file: 'kiro-existing.json', mtimeMs: 100 }],
-      currentTokenFiles: [{ file: 'kiro-existing.json', mtimeMs: 100 }],
+      knownTokenFiles: [{ file: 'kiro-existing.json', mtimeMs: 100, fingerprint: 'same' }],
+      currentTokenFiles: [{ file: 'kiro-existing.json', mtimeMs: 100, fingerprint: 'same' }],
       stdoutData:
         '[error] Kiro IDC authentication failed: login failed: failed to register client: register client failed (status 400)',
       stderrData: '',
