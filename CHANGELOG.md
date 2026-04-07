@@ -1,3 +1,9 @@
+## [7.66.1](https://github.com/kaitranntt/ccs/compare/v7.66.0...v7.66.1) (2026-04-07)
+
+### Hotfixes
+
+* update ai-review workflow model budget ([f954f0f](https://github.com/kaitranntt/ccs/commit/f954f0f8ab906c7e03ab27b0aa07c653d04e622c)), closes [#922](https://github.com/kaitranntt/ccs/issues/922)
+
 ## [7.66.0](https://github.com/kaitranntt/ccs/compare/v7.65.3...v7.66.0) (2026-04-05)
 
 ### Features
