@@ -61,6 +61,7 @@ export function QuickSetupWizard({ open, onClose }: QuickSetupWizardProps) {
   );
   const accounts = useMemo(() => providerAuth?.accounts || [], [providerAuth?.accounts]);
   const catalogs = useMemo(() => buildUiCatalogs(catalogData?.catalogs), [catalogData?.catalogs]);
+  const fetchedCatalogsReady = Boolean(catalogData);
 
   // Reset on close
   useEffect(() => {
@@ -104,7 +105,7 @@ export function QuickSetupWizard({ open, onClose }: QuickSetupWizardProps) {
             const result = await applyDefaultPreset(
               selectedProvider,
               undefined,
-              catalogs[selectedProvider]
+              fetchedCatalogsReady ? catalogs[selectedProvider] : undefined
             );
             if (result.success && result.presetName) {
               toast.success(`Applied "${result.presetName}" preset`);

@@ -264,6 +264,7 @@ export function CliproxyPage() {
   const isRemoteMode = authData?.source === 'remote';
   const variants = useMemo(() => variantsData?.variants || [], [variantsData?.variants]);
   const catalogs = useMemo(() => buildUiCatalogs(catalogData?.catalogs), [catalogData?.catalogs]);
+  const fetchedCatalogsReady = Boolean(catalogData);
 
   // Wrapper to persist provider selection to localStorage
   const setSelectedProvider = (provider: string | null) => {
@@ -561,7 +562,11 @@ export function CliproxyPage() {
         onClose={() => setAddAccountProvider(null)}
         provider={addAccountProvider?.provider || ''}
         displayName={addAccountProvider?.displayName || ''}
-        catalog={addAccountProvider?.provider ? catalogs[addAccountProvider.provider] : undefined}
+        catalog={
+          fetchedCatalogsReady && addAccountProvider?.provider
+            ? catalogs[addAccountProvider.provider]
+            : undefined
+        }
         isFirstAccount={addAccountProvider?.isFirstAccount || false}
       />
     </div>
