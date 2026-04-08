@@ -22,6 +22,9 @@ import {
   resolveDashboardUrls,
 } from './config-dashboard-host';
 import { parseConfigCommandArgs, showConfigCommandHelp } from './config-command-options';
+import { createLogger } from '../services/logging';
+
+const logger = createLogger('command:config');
 
 const CONFIG_SUBCOMMAND_ROUTES: readonly NamedCommandRoute[] = [
   {
@@ -123,6 +126,11 @@ export async function handleConfigCommand(
 
   const options = parsed.options;
   const verbose = options.dev;
+  logger.info('dashboard.launch_requested', 'Config dashboard launch requested', {
+    dev: Boolean(options.dev),
+    host: options.host || null,
+    port: options.port || null,
+  });
 
   console.log(deps.header('CCS Config Dashboard'));
   console.log('');
@@ -130,6 +138,13 @@ export async function handleConfigCommand(
   // Ensure CLIProxy service is running for dashboard features
   console.log(deps.info('Starting CLIProxy service...'));
   const cliproxyResult = await deps.ensureCliproxyService(CLIPROXY_DEFAULT_PORT, verbose);
+  logger.info('cliproxy.ensure_result', 'Config command checked CLIProxy availability', {
+    started: cliproxyResult.started,
+    alreadyRunning: cliproxyResult.alreadyRunning,
+    configRegenerated: cliproxyResult.configRegenerated,
+    port: cliproxyResult.port || null,
+    error: cliproxyResult.error || null,
+  });
 
   if (cliproxyResult.started) {
     if (cliproxyResult.alreadyRunning) {
@@ -210,14 +225,23 @@ export async function handleConfigCommand(
     // Open browser
     try {
       await deps.openBrowser(urls.browserUrl, { wait: false });
+      logger.info('dashboard.browser_opened', 'Config dashboard browser launch attempted', {
+        browserUrl: urls.browserUrl,
+      });
       console.log(deps.info('Browser opened automatically'));
     } catch {
+      logger.warn('dashboard.browser_open_failed', 'Automatic browser launch failed', {
+        browserUrl: urls.browserUrl,
+      });
       console.log(deps.info(`Open manually: ${urls.browserUrl}`));
     }
 
     console.log('');
     console.log(deps.info('Press Ctrl+C to stop'));
   } catch (error) {
+    logger.error('dashboard.launch_failed', 'Config dashboard failed to launch', {
+      message: (error as Error).message,
+    });
     console.error(deps.fail(`Failed to start server: ${(error as Error).message}`));
     process.exit(1);
   }

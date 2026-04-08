@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 
-import { ROOT_COMMAND_CATALOG, getAllRootCommandTokens } from '../../../src/commands/command-catalog';
+import {
+  ROOT_COMMAND_CATALOG,
+  getAllRootCommandTokens,
+} from '../../../src/commands/command-catalog';
 import { ROOT_COMMAND_ROUTES } from '../../../src/commands/root-command-router';
 
 describe('command catalog', () => {
@@ -16,12 +19,18 @@ describe('command catalog', () => {
   });
 
   test('keeps hidden operational hooks out of the public help surface', () => {
-    const hiddenCommands = ROOT_COMMAND_CATALOG.filter((entry) => entry.visibility === 'hidden').map(
-      (entry) => entry.name
-    );
+    const hiddenCommands = ROOT_COMMAND_CATALOG.filter(
+      (entry) => entry.visibility === 'hidden'
+    ).map((entry) => entry.name);
 
     expect(hiddenCommands).toContain('--install');
     expect(hiddenCommands).toContain('--uninstall');
     expect(hiddenCommands).toContain('__complete');
+  });
+
+  test('describes cleanup as removing both CCS and CLIProxy logs', () => {
+    const cleanupCommand = ROOT_COMMAND_CATALOG.find((entry) => entry.name === 'cleanup');
+
+    expect(cleanupCommand?.summary).toBe('Remove old CCS and CLIProxy logs');
   });
 });

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   BarChart3,
   Gauge,
+  ScrollText,
   Github,
   Puzzle,
   TerminalSquare,
@@ -127,6 +128,7 @@ function buildNavGroups(t: (key: string) => string): SidebarGroupDef[] {
       title: t('nav.system'),
       items: [
         { path: '/health', icon: Activity, label: t('nav.health') },
+        { path: '/logs', icon: ScrollText, label: t('nav.logs') },
         { path: '/settings', icon: Settings, label: t('nav.settings') },
       ],
     },

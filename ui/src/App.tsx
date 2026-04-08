@@ -36,6 +36,7 @@ const ClaudeExtensionPage = lazy(() =>
 );
 const CodexPage = lazy(() => import('@/pages/codex').then((m) => ({ default: m.CodexPage })));
 const DroidPage = lazy(() => import('@/pages/droid').then((m) => ({ default: m.DroidPage })));
+const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })));
 const AccountsPage = lazy(() =>
   import('@/pages/accounts').then((m) => ({ default: m.AccountsPage }))
 );
@@ -179,6 +180,14 @@ export default function App() {
                       element={
                         <Suspense fallback={<PageLoader />}>
                           <HealthPage />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/logs"
+                      element={
+                        <Suspense fallback={<PageLoader />}>
+                          <LogsPage />
                         </Suspense>
                       }
                     />

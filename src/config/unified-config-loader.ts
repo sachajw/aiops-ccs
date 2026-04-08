@@ -24,6 +24,7 @@ import {
   DEFAULT_OFFICIAL_CHANNELS_CONFIG,
   DEFAULT_DASHBOARD_AUTH_CONFIG,
   DEFAULT_IMAGE_ANALYSIS_CONFIG,
+  DEFAULT_LOGGING_CONFIG,
 } from './unified-config-types';
 import type {
   UnifiedConfig,
@@ -34,6 +35,7 @@ import type {
   OfficialChannelId,
   DashboardAuthConfig,
   ImageAnalysisConfig,
+  LoggingConfig,
   CursorConfig,
   ContinuityConfig,
 } from './unified-config-types';
@@ -381,6 +383,15 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
             : defaults.cliproxy.routing?.strategy,
       },
     },
+    logging: {
+      enabled: partial.logging?.enabled ?? DEFAULT_LOGGING_CONFIG.enabled,
+      level: partial.logging?.level ?? DEFAULT_LOGGING_CONFIG.level,
+      rotate_mb: partial.logging?.rotate_mb ?? DEFAULT_LOGGING_CONFIG.rotate_mb,
+      retain_days: partial.logging?.retain_days ?? DEFAULT_LOGGING_CONFIG.retain_days,
+      redact: partial.logging?.redact ?? DEFAULT_LOGGING_CONFIG.redact,
+      live_buffer_size:
+        partial.logging?.live_buffer_size ?? DEFAULT_LOGGING_CONFIG.live_buffer_size,
+    },
     preferences: {
       ...defaults.preferences,
       ...partial.preferences,
@@ -656,6 +667,19 @@ function generateYamlWithComments(config: UnifiedConfig): string {
     yaml.dump({ cliproxy: config.cliproxy }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
   );
   lines.push('');
+
+  if (config.logging) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Logging: CCS-owned structured runtime logs');
+    lines.push('# Current file: ~/.ccs/logs/current.jsonl');
+    lines.push('# Archives rotate automatically and are pruned by retain_days.');
+    lines.push('# This is separate from cliproxy.logging, which controls CLIProxy runtime files.');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml.dump({ logging: config.logging }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
+    );
+    lines.push('');
+  }
 
   // CLIProxy Server section (remote proxy configuration) - placed right after cliproxy
   if (config.cliproxy_server) {
@@ -1289,6 +1313,19 @@ export function getImageAnalysisConfig(): ImageAnalysisConfig {
     profile_backends:
       config.image_analysis?.profile_backends ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.profile_backends,
   });
+}
+
+export function getLoggingConfig(): LoggingConfig {
+  const config = loadOrCreateUnifiedConfig();
+
+  return {
+    enabled: config.logging?.enabled ?? DEFAULT_LOGGING_CONFIG.enabled,
+    level: config.logging?.level ?? DEFAULT_LOGGING_CONFIG.level,
+    rotate_mb: config.logging?.rotate_mb ?? DEFAULT_LOGGING_CONFIG.rotate_mb,
+    retain_days: config.logging?.retain_days ?? DEFAULT_LOGGING_CONFIG.retain_days,
+    redact: config.logging?.redact ?? DEFAULT_LOGGING_CONFIG.redact,
+    live_buffer_size: config.logging?.live_buffer_size ?? DEFAULT_LOGGING_CONFIG.live_buffer_size,
+  };
 }
 
 /**

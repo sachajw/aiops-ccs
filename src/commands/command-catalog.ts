@@ -137,7 +137,7 @@ export const ROOT_COMMAND_CATALOG: readonly RootCommandEntry[] = [
   },
   {
     name: 'cleanup',
-    summary: 'Remove old CLIProxy logs',
+    summary: 'Remove old CCS and CLIProxy logs',
     group: 'operations',
     aliases: ['--cleanup'],
     visibility: 'public',

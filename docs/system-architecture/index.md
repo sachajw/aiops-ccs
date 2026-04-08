@@ -1,6 +1,6 @@
 # CCS System Architecture
 
-Last Updated: 2026-03-28
+Last Updated: 2026-04-07
 
 High-level architecture overview for the CCS (Claude Code Switch) system.
 
@@ -18,6 +18,7 @@ The system consists of two main components:
 Dashboard localization (i18n) architecture and contributor workflow are documented in [Dashboard i18n Guide](../i18n-dashboard.md).
 
 CCS v7.34 adds Image Analysis Hook for vision model proxying through CLIProxy with automatic injection for all profile types.
+CCS v7.67 adds a native structured logging lane for CCS-owned runtime events, backed by `src/services/logging/`, bounded JSONL files under `~/.ccs/logs/`, and a dedicated dashboard `/logs` route.
 
 ```
 +===========================================================================+
@@ -215,6 +216,14 @@ For detailed provider flows (CLIProxyAPI, legacy GLMT compatibility, quota manag
 ---
 
 ## Configuration Architecture
+
+### CCS Logging Architecture
+
+- Shared logging contract lives in `src/services/logging/` and is used for CCS-owned runtime diagnostics, request tracing, and bounded recent-entry reads.
+- Config lives at top-level `logging.*` in `~/.ccs/config.yaml`; `cliproxy.logging.*` still controls upstream CLIProxy runtime files only.
+- CCS-owned runtime logs write to `~/.ccs/logs/current.jsonl` and rotate into `~/.ccs/logs/archive/` based on policy.
+- Dashboard exposure uses native `/api/logs/config`, `/api/logs/sources`, and `/api/logs/entries` endpoints plus the `System -> Logs` React page.
+- Request logging explicitly skips `/api/logs` reads so the log viewer does not recursively log itself.
 
 ### Config File Hierarchy
 

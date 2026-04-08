@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { getCcsDir } from '../config-manager';
+import { createLogger } from '../../services/logging';
 
 const TRACE_FILE_NAME = 'websearch-trace.jsonl';
 const NATIVE_WEBSEARCH_TOOL = 'WebSearch';
@@ -17,6 +18,7 @@ const DISALLOWED_TOOLS_FLAG = '--disallowedTools';
 const APPEND_SYSTEM_PROMPT_FLAG = '--append-system-prompt';
 const THIRD_PARTY_WEBSEARCH_STEERING_PROMPT =
   'For web lookup or current-information requests, prefer the CCS MCP tool WebSearch instead of Bash/curl/http fetches. If the user explicitly wants shell commands, or WebSearch is unavailable or fails, you may fall back to Bash/network tools.';
+const logger = createLogger('websearch');
 
 function parseToolValue(rawValue: string): string[] {
   return rawValue
@@ -121,6 +123,11 @@ export function appendWebSearchTrace(
   }
 
   try {
+    logger.info('trace.append', 'WebSearch trace event recorded', {
+      event,
+      launchId: env.CCS_WEBSEARCH_TRACE_LAUNCH_ID || null,
+      payload,
+    });
     const traceFilePath = getTraceFilePath(env);
     fs.mkdirSync(path.dirname(traceFilePath), { recursive: true });
     fs.appendFileSync(

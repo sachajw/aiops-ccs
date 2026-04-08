@@ -234,6 +234,36 @@ export interface CLIProxyConfig {
   routing?: CLIProxyRoutingConfig;
 }
 
+export type LoggingLevel = 'error' | 'warn' | 'info' | 'debug';
+
+/**
+ * CCS-owned structured logging configuration.
+ * Separate from cliproxy.logging, which controls CLIProxy runtime files.
+ */
+export interface LoggingConfig {
+  /** Enable CCS-owned structured runtime logging */
+  enabled: boolean;
+  /** Minimum level written to disk */
+  level: LoggingLevel;
+  /** Rotate current log when it reaches this size in MB */
+  rotate_mb: number;
+  /** Keep archived segments for this many days */
+  retain_days: number;
+  /** Redact sensitive values before persistence */
+  redact: boolean;
+  /** In-memory recent event buffer size for dashboard reads */
+  live_buffer_size: number;
+}
+
+export const DEFAULT_LOGGING_CONFIG: LoggingConfig = {
+  enabled: true,
+  level: 'info',
+  rotate_mb: 10,
+  retain_days: 7,
+  redact: true,
+  live_buffer_size: 250,
+};
+
 /**
  * User preferences.
  */
@@ -812,6 +842,8 @@ export interface UnifiedConfig {
   profiles: Record<string, ProfileConfig>;
   /** CLIProxy configuration */
   cliproxy: CLIProxyConfig;
+  /** CCS-owned structured logging configuration */
+  logging?: LoggingConfig;
   /** User preferences */
   preferences: PreferencesConfig;
   /** WebSearch configuration */
@@ -912,6 +944,7 @@ export function createEmptyUnifiedConfig(): UnifiedConfig {
         strategy: 'round-robin',
       },
     },
+    logging: { ...DEFAULT_LOGGING_CONFIG },
     preferences: {
       theme: 'system',
       telemetry: false,

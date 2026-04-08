@@ -761,6 +761,46 @@ export interface UpdateAccountContext {
   continuity_mode?: 'standard' | 'deeper';
 }
 
+export type LogsLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export interface LogsConfig {
+  enabled: boolean;
+  level: LogsLevel;
+  rotate_mb: number;
+  retain_days: number;
+  redact: boolean;
+  live_buffer_size: number;
+}
+
+export interface LogsSource {
+  source: string;
+  label: string;
+  kind: 'native' | 'legacy';
+  count: number;
+  lastTimestamp: string | null;
+}
+
+export interface LogsEntry {
+  id: string;
+  timestamp: string;
+  level: LogsLevel;
+  source: string;
+  event: string;
+  message: string;
+  processId: number | null;
+  runId: string | null;
+  context?: unknown;
+}
+
+export interface LogsEntriesParams {
+  source?: string;
+  level?: LogsLevel;
+  search?: string;
+  limit?: number;
+}
+
+export type UpdateLogsConfigPayload = Partial<LogsConfig>;
+
 // Unified config types
 export interface ConfigFormat {
   format: 'yaml' | 'json' | 'none';
@@ -963,6 +1003,37 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+  },
+  logs: {
+    getConfig: () => request<{ logging: LogsConfig }>('/logs/config'),
+    updateConfig: (data: UpdateLogsConfigPayload) =>
+      request<{ success: boolean; logging: LogsConfig }>('/logs/config', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    getSources: () => request<{ sources: LogsSource[] }>('/logs/sources'),
+    getEntries: ({ source, level, search, limit }: LogsEntriesParams = {}) => {
+      const params = new URLSearchParams();
+
+      if (source) {
+        params.set('source', source);
+      }
+
+      if (level) {
+        params.set('level', level);
+      }
+
+      if (search) {
+        params.set('search', search);
+      }
+
+      if (typeof limit === 'number') {
+        params.set('limit', String(limit));
+      }
+
+      const query = params.toString();
+      return request<{ entries: LogsEntry[] }>(`/logs/entries${query ? `?${query}` : ''}`);
+    },
   },
   cliproxy: {
     list: () => request<{ variants: Variant[] }>('/cliproxy'),

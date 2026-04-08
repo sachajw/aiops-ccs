@@ -1,6 +1,6 @@
 # CCS Codebase Summary
 
-Last Updated: 2026-03-28
+Last Updated: 2026-04-07
 
 Comprehensive overview of the modularized CCS codebase structure following the Phase 9 modularization effort (Settings, Analytics, Auth Monitor splits + Test Infrastructure), v7.1 Remote CLIProxy feature, v7.2 Kiro + GitHub Copilot (ghcp) OAuth providers, v7.14 Hybrid Quota Management, v7.34 Image Analysis Hook, account-context validation hardening, Official Claude Channels runtime support, and native Codex runtime target support.
 
@@ -268,6 +268,14 @@ src/
 - iMessage is tokenless, macOS-only, and still depends on Claude-side plugin install plus OS permissions.
 - Auto-enable is gated on Bun availability, verified Claude Code v2.1.80+, verified `claude.ai` auth, native Claude `default/account` sessions, and per-channel setup readiness.
 - The dashboard channels section surfaces Bun/version/auth/state-scope status from `/api/channels`, preserves token drafts when save-follow-up refresh fails, and keeps unsupported selected iMessage visible only so it can be turned off.
+
+### Structured Logging Domain
+
+- CCS-owned runtime logging now lives in `src/services/logging/`.
+- The shared domain owns path resolution, redaction, rotation/pruning, buffered recent-entry reads, and the logger factory used by CLI/server/runtime code.
+- Dashboard exposure lives in `src/web-server/routes/logs-routes.ts`, `src/web-server/services/logs-dashboard-service.ts`, and `src/web-server/middleware/request-logging-middleware.ts`.
+- The native dashboard viewer lives at `ui/src/pages/logs.tsx` with supporting components under `ui/src/components/logs/` and hooks in `ui/src/hooks/use-logs.ts`.
+- Legacy CLIProxy error files still exist under `~/.ccs/cliproxy/logs` and are surfaced as a labeled legacy source rather than the primary CCS logging model.
 
 ### Target Adapter Module
 

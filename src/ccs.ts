@@ -68,6 +68,7 @@ import { tryHandleRootCommand } from './commands/root-command-router';
 import { execClaude } from './utils/shell-executor';
 import { isDeprecatedGlmtProfileName, normalizeDeprecatedGlmtEnv } from './utils/glmt-deprecation';
 import { maybeWarnAboutResumeLaneMismatch } from './auth/resume-lane-warning';
+import { createLogger } from './services/logging';
 
 // Import target adapter system
 import {
@@ -321,6 +322,7 @@ async function main(): Promise<void> {
   registerTarget(new ClaudeAdapter());
   registerTarget(new DroidAdapter());
   registerTarget(new CodexAdapter());
+  const cliLogger = createLogger('cli');
 
   const args = process.argv.slice(2);
   const isCompletionCommand = args[0] === '__complete';
@@ -398,6 +400,12 @@ async function main(): Promise<void> {
     return;
   }
 
+  cliLogger.info('command.start', 'CLI invocation started', {
+    command: args[0] || 'default',
+    argCount: args.length,
+    flags: args.filter((arg) => arg.startsWith('-')).slice(0, 20),
+  });
+
   if (shouldPassthroughNativeCodexFlagCommand(args)) {
     execNativeCodexFlagCommand(args);
     return;
@@ -448,6 +456,9 @@ async function main(): Promise<void> {
       recovery.showRecoveryHints();
     }
   } catch (err) {
+    cliLogger.warn('recovery.failed', 'Auto-recovery failed during CLI startup', {
+      message: (err as Error).message,
+    });
     // Recovery is best-effort - don't block basic CLI functionality
     console.warn('[!] Recovery failed:', (err as Error).message);
   }

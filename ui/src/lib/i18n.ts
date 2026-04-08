@@ -33,6 +33,7 @@ const resources = {
         factoryDroid: 'Factory Droid',
         system: 'System',
         health: 'Health',
+        logs: 'Logs',
         settings: 'Settings',
         openrouterTooltip: 'Featured: OpenRouter + Alibaba Coding Plan + Ollama',
       },

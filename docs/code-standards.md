@@ -1,6 +1,6 @@
 # CCS Code Standards
 
-Last Updated: 2026-02-04
+Last Updated: 2026-04-07
 
 Code standards, modularization patterns, and conventions for the CCS codebase.
 
@@ -382,6 +382,14 @@ export type {
 ---
 
 ## Terminal Output Standards
+
+### CCS Logging Standards
+
+- Use the shared logger from `src/services/logging/` for CCS-owned runtime diagnostics, request tracing, and structured events.
+- Keep `utils/ui` and deliberate `console.log`/`console.error` output for user-facing CLI UX only.
+- Redact secrets before persistence; never write raw tokens, cookies, API keys, or password hashes into CCS-owned logs.
+- Persist CCS-owned logs only under `getCcsDir()/logs`; do not invent per-feature log roots.
+- When adding dashboard polling or diagnostics routes, prevent them from recursively logging the log viewer itself.
 
 ### ASCII Only
 
