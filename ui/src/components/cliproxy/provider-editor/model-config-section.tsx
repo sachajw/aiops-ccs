@@ -58,7 +58,7 @@ export function ModelConfigSection({
 
     const uniqueIds = [...new Set(selectedModels)];
     return uniqueIds
-      .map((modelId) => findCatalogModel(catalog.provider, modelId))
+      .map((modelId) => findCatalogModel(catalog.provider, modelId, catalog))
       .filter((model): model is NonNullable<typeof model> => Boolean(model?.extendedContext));
   }, [catalog, currentModel, opusModel, sonnetModel, haikuModel]);
 

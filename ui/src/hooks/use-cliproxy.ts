@@ -28,6 +28,15 @@ export function useCliproxyAuth() {
   });
 }
 
+export function useCliproxyCatalog() {
+  return useQuery({
+    queryKey: ['cliproxy-catalog'],
+    queryFn: () => api.cliproxy.catalog(),
+    staleTime: 30000,
+    retry: 1,
+  });
+}
+
 export function useCliproxyRoutingStrategy() {
   return useQuery({
     queryKey: ['cliproxy-routing'],

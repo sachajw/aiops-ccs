@@ -20,6 +20,7 @@ import { ProxyStatusWidget } from '@/components/monitoring/proxy-status-widget';
 import {
   useCliproxy,
   useCliproxyAuth,
+  useCliproxyCatalog,
   useCliproxyUpdateCheck,
   useSetDefaultAccount,
   useRemoveAccount,
@@ -31,7 +32,7 @@ import {
   useDeleteVariant,
 } from '@/hooks/use-cliproxy';
 import type { AuthStatus, Variant } from '@/lib/api-client';
-import { MODEL_CATALOGS } from '@/lib/model-catalogs';
+import { buildUiCatalogs } from '@/lib/model-catalogs';
 import { getProviderDisplayName, isValidProvider } from '@/lib/provider-config';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -209,6 +210,7 @@ export function CliproxyPage() {
   const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useCliproxyAuth();
   const { data: variantsData, isFetching } = useCliproxy();
+  const { data: catalogData } = useCliproxyCatalog();
   const { data: updateCheck } = useCliproxyUpdateCheck();
   const setDefaultMutation = useSetDefaultAccount();
   const removeMutation = useRemoveAccount();
@@ -261,6 +263,7 @@ export function CliproxyPage() {
   const providers = useMemo(() => authData?.authStatus || [], [authData?.authStatus]);
   const isRemoteMode = authData?.source === 'remote';
   const variants = useMemo(() => variantsData?.variants || [], [variantsData?.variants]);
+  const catalogs = useMemo(() => buildUiCatalogs(catalogData?.catalogs), [catalogData?.catalogs]);
 
   // Wrapper to persist provider selection to localStorage
   const setSelectedProvider = (provider: string | null) => {
@@ -300,6 +303,7 @@ export function CliproxyPage() {
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['cliproxy'] });
     queryClient.invalidateQueries({ queryKey: ['cliproxy-auth'] });
+    queryClient.invalidateQueries({ queryKey: ['cliproxy-catalog'] });
   };
 
   const handlePauseToggle = (provider: string, accountId: string, paused: boolean) => {
@@ -453,7 +457,7 @@ export function CliproxyPage() {
                 provider: selectedVariantData.provider,
               })}
               authStatus={parentAuthForVariant}
-              catalog={MODEL_CATALOGS[selectedVariantData.provider]}
+              catalog={catalogs[selectedVariantData.provider]}
               logoProvider={selectedVariantData.provider}
               baseProvider={selectedVariantData.provider}
               defaultTarget={selectedVariantData.target}
@@ -506,7 +510,7 @@ export function CliproxyPage() {
               provider={selectedStatus.provider}
               displayName={selectedStatus.displayName}
               authStatus={selectedStatus}
-              catalog={MODEL_CATALOGS[selectedStatus.provider]}
+              catalog={catalogs[selectedStatus.provider]}
               isRemoteMode={isRemoteMode}
               topNotice={
                 showAccountSafetyWarning ? (

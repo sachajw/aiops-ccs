@@ -122,7 +122,7 @@ export function ProviderEditor({
     conflictDialog,
     handleConflictResolve,
     missingRequiredFields,
-  } = useProviderEditor(provider);
+  } = useProviderEditor(provider, catalog);
 
   // Defensive normalization: remote/legacy payloads may omit account.provider.
   // Fallback to current editor provider to avoid runtime crashes in account UI.

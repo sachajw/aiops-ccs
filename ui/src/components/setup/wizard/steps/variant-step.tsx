@@ -26,6 +26,7 @@ const CUSTOM_MODEL_VALUE = '__custom__';
 
 export function VariantStep({
   selectedProvider,
+  catalog,
   selectedAccount,
   variantName,
   modelName,
@@ -39,7 +40,8 @@ export function VariantStep({
 }: VariantStepProps) {
   const { t } = useTranslation();
   // Track if user selected custom model option
-  const catalogModels = MODEL_CATALOGS[selectedProvider]?.models || [];
+  const resolvedCatalog = catalog || MODEL_CATALOGS[selectedProvider];
+  const catalogModels = resolvedCatalog?.models || [];
   const isCustomModel = modelName && !catalogModels.some((m) => m.id === modelName);
   const [showCustomInput, setShowCustomInput] = useState(isCustomModel);
   const deniedCustomModel =
@@ -171,9 +173,7 @@ export function VariantStep({
           {showCustomInput
             ? t('setupVariant.enterAnyModel')
             : t('setupVariant.defaultModel', {
-                model:
-                  MODEL_CATALOGS[selectedProvider]?.defaultModel ||
-                  t('setupVariant.providerDefault'),
+                model: resolvedCatalog?.defaultModel || t('setupVariant.providerDefault'),
               })}
         </div>
       </div>

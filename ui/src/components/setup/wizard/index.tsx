@@ -17,6 +17,7 @@ import {
 import { Sparkles } from 'lucide-react';
 import {
   useCliproxyAuth,
+  useCliproxyCatalog,
   useCreateVariant,
   useStartAuth,
   useCancelAuth,
@@ -24,6 +25,7 @@ import {
 import type { AuthStatus, OAuthAccount } from '@/lib/api-client';
 import type { CLIProxyProvider } from '@/lib/provider-config';
 import { applyDefaultPreset } from '@/lib/preset-utils';
+import { buildUiCatalogs } from '@/lib/model-catalogs';
 import i18n from '@/lib/i18n';
 import { usePrivacy } from '@/contexts/privacy-context';
 import { toast } from 'sonner';
@@ -47,6 +49,7 @@ export function QuickSetupWizard({ open, onClose }: QuickSetupWizardProps) {
   const [isAddingNewAccount, setIsAddingNewAccount] = useState(false);
 
   const { data: authData, refetch } = useCliproxyAuth();
+  const { data: catalogData } = useCliproxyCatalog();
   const createMutation = useCreateVariant();
   const startAuthMutation = useStartAuth();
   const cancelAuthMutation = useCancelAuth();
@@ -57,6 +60,7 @@ export function QuickSetupWizard({ open, onClose }: QuickSetupWizardProps) {
     (s: AuthStatus) => s.provider === selectedProvider
   );
   const accounts = useMemo(() => providerAuth?.accounts || [], [providerAuth?.accounts]);
+  const catalogs = useMemo(() => buildUiCatalogs(catalogData?.catalogs), [catalogData?.catalogs]);
 
   // Reset on close
   useEffect(() => {
@@ -228,6 +232,7 @@ export function QuickSetupWizard({ open, onClose }: QuickSetupWizardProps) {
           {step === 'variant' && (
             <VariantStep
               selectedProvider={selectedProvider}
+              catalog={catalogs[selectedProvider]}
               selectedAccount={selectedAccount}
               variantName={variantName}
               modelName={modelName}

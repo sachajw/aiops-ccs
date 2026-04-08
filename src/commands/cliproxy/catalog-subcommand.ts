@@ -1,14 +1,12 @@
 import { initUI, header, subheader, color, dim } from '../../utils/ui';
-import { loadOrCreateUnifiedConfig } from '../../config/unified-config-loader';
-import { createManagementClient } from '../../cliproxy/management-api-client';
 import {
   getCacheAge,
-  setCachedCatalog,
   clearCatalogCache,
   SYNCABLE_PROVIDERS,
-  PROVIDER_TO_CHANNEL,
   getResolvedCatalog,
+  refreshCatalogFromProxy,
 } from '../../cliproxy/catalog-cache';
+import { getProxyTarget } from '../../cliproxy/proxy-target-resolver';
 import type { CLIProxyProvider } from '../../cliproxy/types';
 import type { RemoteModelInfo } from '../../cliproxy/management-api-types';
 
@@ -16,46 +14,27 @@ import type { RemoteModelInfo } from '../../cliproxy/management-api-types';
 async function fetchRemoteCatalogs(
   verbose: boolean
 ): Promise<Record<string, RemoteModelInfo[]> | null> {
-  const config = loadOrCreateUnifiedConfig();
-  const remote = config.cliproxy_server?.remote;
-
-  if (!remote?.host) {
-    if (verbose) console.log(dim('  No remote CLIProxy configured'));
-    return null;
-  }
-
-  const client = createManagementClient(remote);
-
-  // Check health first
-  const health = await client.health();
-  if (!health.healthy) {
-    console.log(color(`  [!] CLIProxy unreachable: ${health.error || 'unknown error'}`, 'warning'));
-    return null;
-  }
+  const target = getProxyTarget();
 
   if (verbose) {
-    console.log(dim(`  Connected to ${client.getBaseUrl()}`));
-    if (health.version) console.log(dim(`  CLIProxy version: ${health.version}`));
+    console.log(
+      dim(
+        `  Connected to ${target.protocol}://${target.host}:${target.port} (${target.isRemote ? 'remote' : 'local'})`
+      )
+    );
   }
 
-  const result: Record<string, RemoteModelInfo[]> = {};
-
-  for (const provider of SYNCABLE_PROVIDERS) {
-    const channel = PROVIDER_TO_CHANNEL[provider];
-    if (!channel) continue;
-
-    try {
-      const response = await client.getModelDefinitions(channel);
-      if (response && response.length > 0) {
-        result[provider] = response;
-        if (verbose) console.log(dim(`  ${provider}: ${response.length} models`));
+  const result = await refreshCatalogFromProxy();
+  if (verbose && result) {
+    for (const provider of SYNCABLE_PROVIDERS) {
+      const models = result[provider];
+      if (models?.length) {
+        console.log(dim(`  ${provider}: ${models.length} models`));
       }
-    } catch {
-      if (verbose) console.log(dim(`  ${provider}: fetch failed (skipped)`));
     }
   }
 
-  return Object.keys(result).length > 0 ? result : null;
+  return result;
 }
 
 /** Show catalog status */
@@ -104,12 +83,10 @@ export async function handleCatalogRefresh(verbose: boolean): Promise<void> {
 
   const result = await fetchRemoteCatalogs(verbose);
   if (!result) {
-    console.log('  Failed to fetch remote catalogs. Static catalog unchanged.');
+    console.log('  Failed to fetch live catalogs. Static catalog unchanged.');
     console.log('');
     return;
   }
-
-  setCachedCatalog(result);
 
   // Show summary
   let totalModels = 0;
@@ -117,7 +94,7 @@ export async function handleCatalogRefresh(verbose: boolean): Promise<void> {
     const merged = getResolvedCatalog(provider as CLIProxyProvider);
     const mergedCount = merged?.models.length ?? 0;
     console.log(
-      `  ${color(provider.padEnd(12), 'command')} ${models.length} remote -> ${mergedCount} merged`
+      `  ${color(provider.padEnd(12), 'command')} ${models.length} live -> ${mergedCount} merged`
     );
     totalModels += mergedCount;
   }

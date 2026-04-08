@@ -7,6 +7,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { SettingsResponse, UseProviderEditorReturn } from './types';
+import type { ProviderCatalog } from '../provider-model-selector';
 import {
   applyExtendedContextPreferenceToAnthropicModels,
   hasAnthropicExtendedContextEnabled,
@@ -23,7 +24,10 @@ function checkMissingFields(settings: { env?: Record<string, string> }): string[
   return REQUIRED_ENV_KEYS.filter((key) => !env[key]?.trim());
 }
 
-export function useProviderEditor(provider: string): UseProviderEditorReturn {
+export function useProviderEditor(
+  provider: string,
+  catalog?: ProviderCatalog
+): UseProviderEditorReturn {
   const [rawJsonEdits, setRawJsonEdits] = useState<string | null>(null);
   const [conflictDialog, setConflictDialog] = useState(false);
   const queryClient = useQueryClient();
@@ -82,9 +86,9 @@ export function useProviderEditor(provider: string): UseProviderEditorReturn {
   const applySavedLongContextIntent = useCallback(
     (env: Record<string, string>, enabled: boolean) =>
       applyExtendedContextPreferenceToAnthropicModels(env, enabled, {
-        supportsExtendedContext: (modelId) => supportsExtendedContext(provider, modelId),
+        supportsExtendedContext: (modelId) => supportsExtendedContext(provider, modelId, catalog),
       }),
-    [provider]
+    [catalog, provider]
   );
 
   // Update a single setting value

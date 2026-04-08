@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  buildUiCatalogs,
   MODEL_CATALOGS,
   findCatalogModel,
   getResolvedCatalogModels,
@@ -26,6 +27,16 @@ describe('claude preset utils', () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
+        json: async () => ({
+          catalogs: {
+            claude: MODEL_CATALOGS.claude,
+          },
+          source: 'live',
+          cache: { synced: true, age: '0m ago' },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         json: async () => ({ apiKey: { value: 'managed-key' } }),
       })
       .mockResolvedValueOnce({ ok: true });
@@ -36,7 +47,7 @@ describe('claude preset utils', () => {
 
     expect(result).toEqual({ success: true, presetName: 'Claude Sonnet 4.6' });
 
-    const [, requestInit] = fetchMock.mock.calls[1] ?? [];
+    const [, requestInit] = fetchMock.mock.calls[2] ?? [];
     const body = JSON.parse(String(requestInit?.body));
 
     expect(body.settings.env).toMatchObject({
@@ -45,6 +56,37 @@ describe('claude preset utils', () => {
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-sonnet-4-6',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-haiku-4-5-20251001',
     });
+  });
+
+  it('builds UI catalogs from upstream provider models without requiring static dropdown edits', () => {
+    const liveCatalogs = {
+      gemini: {
+        provider: 'gemini',
+        displayName: 'Gemini',
+        defaultModel: 'gemini-3.9-pro-preview',
+        models: [
+          { id: 'gemini-3.9-pro-preview', name: 'Gemini 3.9 Pro Preview' },
+          { id: 'gemini-3-9-flash-preview', name: 'Gemini 3.9 Flash Preview' },
+        ],
+      },
+    };
+
+    const catalogs = buildUiCatalogs(liveCatalogs);
+    const resolvedGeminiModels = getResolvedCatalogModels(catalogs.gemini, [
+      { id: 'gemini-3.9-pro-preview', owned_by: 'google' },
+      { id: 'gemini-3-9-flash-preview', owned_by: 'google' },
+    ]);
+
+    expect(catalogs.gemini?.defaultModel).toBe('gemini-3.9-pro-preview');
+    expect(resolvedGeminiModels.find((model) => model.id === 'gemini-3.9-pro-preview')).toEqual(
+      expect.objectContaining({
+        name: 'Gemini 3.9 Pro Preview',
+        presetMapping: expect.objectContaining({
+          default: 'gemini-3.9-pro-preview',
+          haiku: 'gemini-3-9-flash-preview',
+        }),
+      })
+    );
   });
 
   it('keeps Gemini presets on 3.1 Pro while resolving 3/3.1 alias variants', () => {

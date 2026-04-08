@@ -680,8 +680,7 @@ export const MODEL_CATALOGS: Record<string, ProviderCatalog> = {
   },
 };
 
-export function findCatalogModel(provider: string, modelId: string) {
-  const catalog = MODEL_CATALOGS[provider.toLowerCase()];
+function findCatalogModelInCatalog(catalog: ProviderCatalog | undefined, modelId: string) {
   if (!catalog) return undefined;
 
   const normalizedModelId = normalizeModelId(modelId);
@@ -709,6 +708,91 @@ export function findCatalogModel(provider: string, modelId: string) {
       } => Boolean(candidate.info && candidate.info.family === geminiModelInfo.family)
     )
     .sort((left, right) => compareGeminiVersions(right.info.version, left.info.version))[0]?.model;
+}
+
+function normalizeCatalogTier(tier: unknown): ModelEntry['tier'] {
+  if (tier === 'free') return 'free';
+  if (typeof tier === 'string' && tier.trim().length > 0) return 'paid';
+  return undefined;
+}
+
+export function buildUiCatalog(
+  provider: string,
+  liveCatalog: ProviderCatalog | undefined
+): ProviderCatalog | undefined {
+  const staticCatalog = MODEL_CATALOGS[provider.toLowerCase()];
+  if (!liveCatalog || liveCatalog.models.length === 0) {
+    return staticCatalog;
+  }
+
+  const availableModels = liveCatalog.models.map((model) => ({
+    id: model.id,
+    owned_by: liveCatalog.provider,
+  }));
+
+  const models = liveCatalog.models.map((model) => {
+    const staticModel = findCatalogModelInCatalog(staticCatalog, model.id);
+    return {
+      ...model,
+      name: model.name || staticModel?.name || model.id,
+      tier: staticModel?.tier ?? normalizeCatalogTier(model.tier),
+      description: model.description ?? staticModel?.description,
+      broken: staticModel?.broken,
+      issueUrl: staticModel?.issueUrl,
+      deprecated: staticModel?.deprecated,
+      deprecationReason: staticModel?.deprecationReason,
+      extendedContext: model.extendedContext ?? staticModel?.extendedContext,
+      presetMapping: staticModel?.presetMapping,
+    };
+  });
+
+  const fallbackDefaultModel = staticCatalog?.defaultModel
+    ? resolveCatalogModelId(staticCatalog.defaultModel, availableModels)
+    : undefined;
+  const hasFallbackDefaultModel =
+    typeof fallbackDefaultModel === 'string' &&
+    availableModels.some(
+      (model) => normalizeModelId(model.id) === normalizeModelId(fallbackDefaultModel)
+    );
+
+  return {
+    provider: liveCatalog.provider,
+    displayName: liveCatalog.displayName || staticCatalog?.displayName || provider,
+    defaultModel: hasFallbackDefaultModel ? fallbackDefaultModel : liveCatalog.defaultModel,
+    models,
+  };
+}
+
+export function buildUiCatalogs(
+  liveCatalogs: Partial<Record<string, ProviderCatalog>> | undefined
+): Partial<Record<string, ProviderCatalog>> {
+  const catalogs: Partial<Record<string, ProviderCatalog>> = {};
+  const providers = new Set<string>([
+    ...Object.keys(MODEL_CATALOGS),
+    ...Object.keys(liveCatalogs ?? {}),
+  ]);
+
+  for (const provider of providers) {
+    const catalog = buildUiCatalog(provider, liveCatalogs?.[provider]);
+    if (catalog) {
+      catalogs[provider] = catalog;
+    }
+  }
+
+  return catalogs;
+}
+
+export function findCatalogModel(
+  provider: string,
+  modelId: string,
+  catalogOverride?: ProviderCatalog
+) {
+  const overrideMatch = findCatalogModelInCatalog(catalogOverride, modelId);
+  if (overrideMatch) {
+    return overrideMatch;
+  }
+
+  return findCatalogModelInCatalog(MODEL_CATALOGS[provider.toLowerCase()], modelId);
 }
 
 export function resolveCatalogModelId(
@@ -773,6 +857,10 @@ export function getResolvedCatalogModels(
     });
 }
 
-export function supportsExtendedContext(provider: string, modelId: string): boolean {
-  return findCatalogModel(provider, modelId)?.extendedContext === true;
+export function supportsExtendedContext(
+  provider: string,
+  modelId: string,
+  catalogOverride?: ProviderCatalog
+): boolean {
+  return findCatalogModel(provider, modelId, catalogOverride)?.extendedContext === true;
 }

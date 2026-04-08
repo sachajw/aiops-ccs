@@ -448,6 +448,42 @@ export interface CliproxyModelsResponse {
   totalCount: number;
 }
 
+export interface CliproxyCatalogPresetMapping {
+  default: string;
+  opus: string;
+  sonnet: string;
+  haiku: string;
+}
+
+export interface CliproxyCatalogModel {
+  id: string;
+  name: string;
+  tier?: 'free' | 'paid';
+  description?: string;
+  broken?: boolean;
+  issueUrl?: string;
+  deprecated?: boolean;
+  deprecationReason?: string;
+  extendedContext?: boolean;
+  presetMapping?: CliproxyCatalogPresetMapping;
+}
+
+export interface CliproxyProviderCatalog {
+  provider: string;
+  displayName: string;
+  models: CliproxyCatalogModel[];
+  defaultModel: string;
+}
+
+export interface CliproxyCatalogResponse {
+  catalogs: Partial<Record<string, CliproxyProviderCatalog>>;
+  source: 'live' | 'cache' | 'static';
+  cache: {
+    synced: boolean;
+    age: string | null;
+  };
+}
+
 /** Individual model quota info from Google Cloud Code API */
 export interface ModelQuota {
   /** Model name, e.g., "gemini-3-pro-high" */
@@ -1070,6 +1106,7 @@ export const api = {
 
     // Stats and models for Overview tab
     stats: () => request<{ usage: Record<string, unknown> }>('/cliproxy/usage'),
+    catalog: () => request<CliproxyCatalogResponse>('/cliproxy/catalog'),
     models: () => request<CliproxyModelsResponse>('/cliproxy/models'),
     updateModel: (provider: string, model: string) =>
       request(`/cliproxy/models/${provider}`, {

@@ -4,6 +4,7 @@
  */
 
 import { MODEL_CATALOGS } from './model-catalogs';
+import { buildUiCatalogs } from './model-catalogs';
 import { CLIPROXY_DEFAULT_PORT } from './default-ports';
 export { CLIPROXY_DEFAULT_PORT } from './default-ports';
 
@@ -25,6 +26,22 @@ async function fetchEffectiveApiKey(): Promise<string> {
   }
 }
 
+async function fetchProviderCatalog(provider: string) {
+  try {
+    const response = await fetch('/api/cliproxy/catalog');
+    if (!response.ok) {
+      return MODEL_CATALOGS[provider];
+    }
+
+    const data = (await response.json()) as {
+      catalogs?: Partial<Record<string, (typeof MODEL_CATALOGS)[string]>>;
+    };
+    return buildUiCatalogs(data.catalogs)[provider] ?? MODEL_CATALOGS[provider];
+  } catch {
+    return MODEL_CATALOGS[provider];
+  }
+}
+
 /**
  * Apply default preset for a provider to its settings
  * Uses the catalog default model's preset mapping or falls back to using defaultModel for all tiers
@@ -37,7 +54,7 @@ export async function applyDefaultPreset(
   provider: string,
   port?: number
 ): Promise<{ success: boolean; presetName?: string }> {
-  const catalog = MODEL_CATALOGS[provider];
+  const catalog = await fetchProviderCatalog(provider);
   if (!catalog) return { success: false };
 
   const defaultModelEntry =
