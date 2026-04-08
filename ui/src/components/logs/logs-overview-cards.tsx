@@ -70,7 +70,7 @@ export function LogsOverviewCards({
       <MetricCard
         label="Coverage"
         value={formatCount(sources.length)}
-        detail={`${nativeSources} native • ${legacySources} legacy sources`}
+        detail={`${nativeSources} active sources${legacySources > 0 ? ` • ${legacySources} legacy` : ''}`}
         icon={Database}
         accent="bg-sky-500/10 text-sky-700 dark:text-sky-300"
       />
@@ -81,7 +81,7 @@ export function LogsOverviewCards({
         icon={Activity}
         accent="bg-violet-500/10 text-violet-700 dark:text-violet-300"
       />
-      <div className="md:col-span-2 xl:col-span-4 rounded-xl border bg-card/70 px-4 py-3 text-sm text-muted-foreground">
+      <div className="md:col-span-2 xl:col-span-4 rounded-2xl border border-border/70 bg-card/70 px-4 py-3 text-sm text-muted-foreground shadow-sm">
         Last ingested event:{' '}
         <span className="font-medium text-foreground">{formatLogTimestamp(latestTimestamp)}</span>
       </div>

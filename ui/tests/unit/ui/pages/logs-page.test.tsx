@@ -41,7 +41,7 @@ function buildEntries(source: string) {
         source: 'agent-runner',
         event: 'task.retry',
         message: 'Worker retry scheduled',
-        processId: 'worker-1',
+        processId: 4121,
         runId: 'run-2',
         context: { attempt: 2, reason: 'network jitter' },
       },
@@ -56,7 +56,7 @@ function buildEntries(source: string) {
       source: 'dashboard',
       event: 'logs.bootstrap',
       message: 'Boot sequence failed for dashboard logging',
-      processId: 'api-1',
+      processId: 25582,
       runId: 'run-1',
       context: { component: 'dashboard', stage: 'bootstrap' },
     },
@@ -67,7 +67,7 @@ function buildEntries(source: string) {
       source: 'agent-runner',
       event: 'task.retry',
       message: 'Worker retry scheduled',
-      processId: 'worker-1',
+      processId: 4121,
       runId: 'run-2',
       context: { attempt: 2, reason: 'network jitter' },
     },
@@ -150,8 +150,7 @@ describe('LogsPage', () => {
       (await screen.findAllByText('Boot sequence failed for dashboard logging')).length
     ).toBeGreaterThan(0);
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Source filter' }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Agent Runner' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Agent Runner' }));
 
     expect((await screen.findAllByText('Worker retry scheduled')).length).toBeGreaterThan(0);
     await waitFor(() => {
@@ -185,7 +184,7 @@ describe('LogsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Worker retry scheduled/i }));
 
     expect((await screen.findAllByText('task.retry')).length).toBeGreaterThan(0);
-    expect(screen.getByText('worker-1')).toBeInTheDocument();
+    expect(screen.getByText('4121')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: /Raw context/i }));
 

@@ -41,7 +41,7 @@ export function LogsConfigCard({
   const isDirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(config), [config, draft]);
 
   return (
-    <Card className="gap-4">
+    <Card className="gap-4 border-border/70 bg-card/85 shadow-sm">
       <CardHeader className="space-y-2 border-b pb-4">
         <div className="flex items-center gap-2">
           <Settings2 className="h-4 w-4 text-muted-foreground" />
@@ -52,10 +52,12 @@ export function LogsConfigCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+        <div className="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="font-medium">Current posture</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+                Current posture
+              </p>
               <p className="text-muted-foreground">
                 {config.enabled ? 'Logging is enabled' : 'Logging is disabled'} at{' '}
                 {config.level.toUpperCase()} and above.
@@ -68,7 +70,7 @@ export function LogsConfigCard({
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/60 p-3">
             <div className="space-y-1">
               <Label htmlFor="logs-enabled">Enabled</Label>
               <p className="text-xs text-muted-foreground">
@@ -84,7 +86,7 @@ export function LogsConfigCard({
             />
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-xl border p-3">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/60 p-3">
             <div className="space-y-1">
               <Label htmlFor="logs-redact">Redact payloads</Label>
               <p className="text-xs text-muted-foreground">
@@ -109,7 +111,11 @@ export function LogsConfigCard({
               setDraft((current) => ({ ...current, level: value as LogsConfig['level'] }))
             }
           >
-            <SelectTrigger id="logs-config-level" aria-label="Minimum log level">
+            <SelectTrigger
+              id="logs-config-level"
+              aria-label="Minimum log level"
+              className="border-border/70 bg-background/70"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -128,6 +134,7 @@ export function LogsConfigCard({
               id="logs-rotate-mb"
               type="number"
               min={1}
+              className="border-border/70 bg-background/70"
               value={draft.rotate_mb}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -143,6 +150,7 @@ export function LogsConfigCard({
               id="logs-retain-days"
               type="number"
               min={1}
+              className="border-border/70 bg-background/70"
               value={draft.retain_days}
               onChange={(event) =>
                 setDraft((current) => ({
@@ -160,6 +168,7 @@ export function LogsConfigCard({
             id="logs-buffer-size"
             type="number"
             min={1}
+            className="border-border/70 bg-background/70"
             value={draft.live_buffer_size}
             onChange={(event) =>
               setDraft((current) => ({
@@ -170,7 +179,7 @@ export function LogsConfigCard({
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 border-t border-border/70 pt-4">
           <Button onClick={() => onSave(draft)} disabled={!isDirty || isPending} className="gap-2">
             <Save className="h-4 w-4" />
             Save policy

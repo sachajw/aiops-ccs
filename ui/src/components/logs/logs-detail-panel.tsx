@@ -24,12 +24,14 @@ export function LogsDetailPanel({
 }) {
   if (!entry) {
     return (
-      <Card className="gap-4">
+      <Card className="gap-4 border-border/70 bg-card/85 shadow-sm">
         <CardHeader>
-          <CardTitle>Entry details</CardTitle>
-          <CardDescription>Select a log entry to inspect metadata and raw context.</CardDescription>
+          <CardTitle>Inspector</CardTitle>
+          <CardDescription>
+            Select an activity row to inspect its operational metadata.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex min-h-[34rem] items-center justify-center text-sm text-muted-foreground">
+        <CardContent className="flex min-h-[42rem] items-center justify-center text-sm text-muted-foreground">
           Nothing selected yet.
         </CardContent>
       </Card>
@@ -37,7 +39,7 @@ export function LogsDetailPanel({
   }
 
   return (
-    <Card className="gap-4">
+    <Card className="gap-4 border-border/70 bg-card/85 shadow-sm">
       <CardHeader className="space-y-3 border-b pb-4">
         <div className="flex flex-wrap items-center gap-2">
           <LogLevelBadge level={entry.level} />
@@ -49,7 +51,7 @@ export function LogsDetailPanel({
           </span>
         </div>
         <div className="space-y-1">
-          <CardTitle>{entry.event}</CardTitle>
+          <CardTitle className="text-2xl tracking-tight">{entry.event}</CardTitle>
           <CardDescription className="text-sm leading-6 text-foreground/85">
             {entry.message}
           </CardDescription>
@@ -74,6 +76,18 @@ export function LogsDetailPanel({
               <MetaRow label="Source" value={entry.source} />
               <MetaRow label="Process ID" value={entry.processId ?? 'Unavailable'} />
               <MetaRow label="Run ID" value={entry.runId ?? 'Unavailable'} />
+            </div>
+            <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                Context summary
+              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                This entry belongs to{' '}
+                <span className="font-medium text-foreground">{sourceLabel ?? entry.source}</span>{' '}
+                and was emitted at the{' '}
+                <span className="font-medium text-foreground">{entry.level}</span> threshold. Use
+                the raw tab for the exact structured payload.
+              </p>
             </div>
           </TabsContent>
 
