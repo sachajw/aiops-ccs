@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getAuthDir } from './config-generator';
 import { getProviderAccounts, getPausedDir } from './account-manager';
-import { sanitizeEmail, isTokenExpired } from './auth-utils';
+import { getTokenExpiryTimestamp, sanitizeEmail, isTokenExpired } from './auth-utils';
 import { refreshGeminiToken } from './auth/gemini-token-refresh';
 import {
   buildGeminiCliBucketsFromParsedBuckets,
@@ -38,7 +38,7 @@ interface GeminiCliAuthData {
   accessToken: string;
   projectId: string | null;
   isExpired: boolean;
-  expiresAt: string | null;
+  expiresAt: string | number | null;
 }
 
 /** Raw bucket from API response */
@@ -130,15 +130,21 @@ function extractAccessToken(data: Record<string, unknown>): string | null {
  * Extract expiry from Gemini auth file data
  * Handles both flat (expired) and nested (token.expiry) structures
  */
-function extractExpiry(data: Record<string, unknown>): string | null {
+function extractExpiry(data: Record<string, unknown>): string | number | null {
   // Flat structure: { expired: "..." }
   if (typeof data.expired === 'string') {
+    return data.expired;
+  }
+  if (typeof data.expired === 'number') {
     return data.expired;
   }
   // Nested structure: { token: { expiry: "..." } }
   if (data.token && typeof data.token === 'object') {
     const token = data.token as Record<string, unknown>;
     if (typeof token.expiry === 'string') {
+      return token.expiry;
+    }
+    if (typeof token.expiry === 'number') {
       return token.expiry;
     }
   }
@@ -736,10 +742,10 @@ export async function fetchGeminiCliQuota(
 
   // Proactive refresh: refresh if expired OR expiring within 5 minutes
   const REFRESH_LEAD_TIME_MS = 5 * 60 * 1000;
+  const expiresAt = getTokenExpiryTimestamp(authData.expiresAt);
   const shouldRefresh =
-    authData.isExpired ||
-    !authData.expiresAt ||
-    new Date(authData.expiresAt).getTime() - Date.now() < REFRESH_LEAD_TIME_MS;
+    authData.isExpired || expiresAt === null || expiresAt - Date.now() < REFRESH_LEAD_TIME_MS;
+  let refreshedBeforeQuotaFetch = false;
 
   if (shouldRefresh) {
     if (verbose)
@@ -748,9 +754,10 @@ export async function fetchGeminiCliQuota(
           ? '[i] Token expired, refreshing...'
           : '[i] Token expiring soon, proactive refresh...'
       );
-    const refreshResult = await refreshGeminiToken();
+    const refreshResult = await refreshGeminiToken(accountId);
 
     if (refreshResult.success) {
+      refreshedBeforeQuotaFetch = true;
       if (verbose) console.error('[i] Token refreshed successfully');
       // Re-read auth data after successful refresh
       const refreshedAuthData = readGeminiCliAuthData(accountId);
@@ -776,10 +783,10 @@ export async function fetchGeminiCliQuota(
   // First attempt with current token
   const result = await fetchWithAuthData(authData, accountId, verbose);
 
-  // If 401 error and we haven't refreshed yet, try refresh and retry
-  if (result.needsReauth && result.error?.includes('expired')) {
+  // Retry once with an account-scoped refresh when the quota endpoint rejects auth.
+  if (result.needsReauth && !refreshedBeforeQuotaFetch) {
     if (verbose) console.error('[i] Got 401, attempting refresh and retry...');
-    const refreshResult = await refreshGeminiToken();
+    const refreshResult = await refreshGeminiToken(accountId);
     if (refreshResult.success) {
       const refreshedAuthData = readGeminiCliAuthData(accountId);
       if (refreshedAuthData) {

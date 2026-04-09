@@ -131,11 +131,21 @@ describe('AccountCard grouped quota tooltip', () => {
     );
 
     await userEvent.hover(screen.getByText('Business'));
-    expect((await screen.findAllByText('Plan: team')).length).toBeGreaterThan(0);
+    const businessPlan = (await screen.findAllByText('Plan: team')).find((node) =>
+      node.closest('[data-slot="tooltip-content"]')
+    );
+    expect(businessPlan).toBeInTheDocument();
     expect(screen.getAllByText('5h usage limit').length).toBeGreaterThan(0);
+    const tooltipContent = businessPlan.closest('[data-slot="tooltip-content"]');
+    expect(tooltipContent?.className).toContain('bg-popover');
+    expect(tooltipContent?.className).toContain('text-popover-foreground');
+    expect(tooltipContent?.className).toContain('max-w-[calc(100vw-2rem)]');
 
     await userEvent.hover(screen.getByText('Personal'));
-    expect((await screen.findAllByText('Plan: plus')).length).toBeGreaterThan(0);
+    const personalPlan = (await screen.findAllByText('Plan: plus')).find((node) =>
+      node.closest('[data-slot="tooltip-content"]')
+    );
+    expect(personalPlan).toBeInTheDocument();
     expect(screen.getAllByText('Weekly usage limit').length).toBeGreaterThan(0);
   });
 });

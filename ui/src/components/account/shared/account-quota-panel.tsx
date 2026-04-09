@@ -250,7 +250,7 @@ export function AccountQuotaPanel({
                 </div>
               )}
             </TooltipTrigger>
-            <TooltipContent side={mode === 'compact' ? 'top' : 'bottom'} className="max-w-xs">
+            <TooltipContent side={mode === 'compact' ? 'top' : 'bottom'} className="sm:max-w-sm">
               <QuotaTooltipContent quota={quota} resetTime={resetTime} />
             </TooltipContent>
           </Tooltip>
@@ -306,23 +306,8 @@ export function AccountQuotaPanel({
             </div>
           )}
         </TooltipTrigger>
-        <TooltipContent side={mode === 'compact' ? 'top' : 'bottom'} className="max-w-[260px]">
-          <div className="space-y-1 text-xs">
-            <p>{failureInfo.summary}</p>
-            {failureInfo.actionHint && (
-              <p className="text-muted-foreground">{failureInfo.actionHint}</p>
-            )}
-            {failureInfo.technicalDetail && (
-              <p className="font-mono text-[11px] text-muted-foreground">
-                {failureInfo.technicalDetail}
-              </p>
-            )}
-            {failureInfo.rawDetail && (
-              <pre className="whitespace-pre-wrap break-all rounded bg-muted/40 px-2 py-1 font-mono text-[10px] text-muted-foreground">
-                {failureInfo.rawDetail}
-              </pre>
-            )}
-          </div>
+        <TooltipContent side={mode === 'compact' ? 'top' : 'bottom'} className="sm:max-w-sm">
+          <QuotaTooltipContent quota={quota} resetTime={resetTime} />
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
