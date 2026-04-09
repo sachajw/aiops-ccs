@@ -1,6 +1,6 @@
 # CCS Project Roadmap
 
-Last Updated: 2026-04-08
+Last Updated: 2026-04-09
 
 Forward-looking roadmap documenting current priorities, GitHub issues, and future feature plans.
 
@@ -41,6 +41,7 @@ All major modularization work is complete. The codebase evolved from monolithic 
 
 ### Recent Fixes
 
+- **2026-04-09**: **#938** Cliproxy model routing now exposes backend-pinned short prefixes for overlapping OAuth backends. CCS repairs managed OAuth auth-file prefixes for Gemini CLI (`gcli`) and Antigravity (`agy`), enriches `/api/cliproxy/catalog` with routing hints that show whether an unprefixed model is safe, shadowed, or prefix-only, upgrades `ccs cliproxy catalog` plus interactive variant model pickers to surface the pinned names, and updates the `ccs config` Cliproxy model selection UI so users can see the preferred call name and current effective backend before saving settings.
 - **2026-04-08**: **#931** `/cliproxy` model pickers now source their provider catalogs from CLIProxy management model definitions instead of treating the UI catalog file as the dropdown source of truth. CCS now refreshes live model definitions for Gemini, Codex, Claude, Antigravity, Qwen, iFlow, Kiro, GitHub Copilot, and Kimi through `/api/cliproxy/catalog`, overlays CCS-only preset/default metadata on top of those upstream models, keeps `/api/cliproxy/models` as the live availability feed, and falls back to cached/static catalogs when the proxy is unavailable so the dashboard never goes blank.
 - **2026-04-08**: **#929** Image Analysis hardening now makes the managed `ccs-image-analysis` MCP path authoritative on healthy Claude-target launches, suppresses stale CCS-managed image `Read` hooks instead of letting them compete with MCP, keeps the legacy hook available only as compatibility fallback when MCP provisioning fails, and extends self-heal to dashboard provisioning plus `ccs doctor --fix` so stale hook files and missing isolated MCP sync are repaired automatically.
 - **2026-04-07**: CLIProxy routing strategy is now a first-class CCS surface. Users can inspect and explicitly change `round-robin` vs `fill-first` from `ccs cliproxy routing` and from a native `/cliproxy` dashboard card. Local mode now persists the chosen startup default into CCS-managed CLIProxy config generation, while untouched installs remain on `round-robin`. CCS deliberately does not infer strategy from account composition.
