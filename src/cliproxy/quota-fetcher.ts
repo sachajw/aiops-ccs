@@ -185,6 +185,7 @@ interface ProjectLookupResult {
   tier?: AccountTier;
   rawTierId?: string | null;
   rawTierLabel?: string | null;
+  entitlement?: ProviderEntitlementEvidence;
   error?: string;
   errorCode?: string;
   errorDetail?: string;
@@ -219,7 +220,14 @@ function buildAntigravityFailure(
   bodyText?: string
 ): Pick<
   QuotaResult,
-  'error' | 'errorCode' | 'errorDetail' | 'actionHint' | 'retryable' | 'httpStatus' | 'needsReauth'
+  | 'error'
+  | 'errorCode'
+  | 'errorDetail'
+  | 'actionHint'
+  | 'retryable'
+  | 'httpStatus'
+  | 'needsReauth'
+  | 'entitlement'
 > & { isForbidden?: boolean } {
   const detail = normalizeErrorDetail(bodyText || '');
 
@@ -232,6 +240,13 @@ function buildAntigravityFailure(
         'Re-authenticate this account. If CLIProxy is running, retry after the proxy finishes refreshing the token.',
       needsReauth: true,
       errorDetail: detail,
+      entitlement: buildProviderEntitlementEvidence({
+        normalizedTier: 'unknown',
+        source: 'runtime_inference',
+        confidence: 'medium',
+        accessState: 'unknown',
+        capacityState: 'unknown',
+      }),
     };
   }
 
@@ -243,6 +258,13 @@ function buildAntigravityFailure(
       actionHint: 'This account does not have Gemini Code Assist quota access.',
       isForbidden: true,
       errorDetail: detail,
+      entitlement: buildProviderEntitlementEvidence({
+        normalizedTier: 'unknown',
+        source: 'runtime_inference',
+        confidence: 'medium',
+        accessState: 'not_entitled',
+        capacityState: 'unknown',
+      }),
     };
   }
 
@@ -254,6 +276,13 @@ function buildAntigravityFailure(
       actionHint: 'Retry later. This looks temporary.',
       retryable: true,
       errorDetail: detail,
+      entitlement: buildProviderEntitlementEvidence({
+        normalizedTier: 'unknown',
+        source: 'runtime_inference',
+        confidence: 'low',
+        accessState: 'unknown',
+        capacityState: 'rate_limited',
+      }),
     };
   }
 
@@ -265,6 +294,13 @@ function buildAntigravityFailure(
       actionHint: 'Retry later. This looks temporary.',
       retryable: true,
       errorDetail: detail,
+      entitlement: buildProviderEntitlementEvidence({
+        normalizedTier: 'unknown',
+        source: 'runtime_inference',
+        confidence: 'low',
+        accessState: 'unknown',
+        capacityState: 'temporarily_unavailable',
+      }),
     };
   }
 
@@ -276,6 +312,13 @@ function buildAntigravityFailure(
       actionHint: 'Retry later. The provider appears unavailable.',
       retryable: true,
       errorDetail: detail,
+      entitlement: buildProviderEntitlementEvidence({
+        normalizedTier: 'unknown',
+        source: 'runtime_inference',
+        confidence: 'low',
+        accessState: 'unknown',
+        capacityState: 'temporarily_unavailable',
+      }),
     };
   }
 
@@ -285,6 +328,13 @@ function buildAntigravityFailure(
       error: `API error: ${status}`,
       errorCode: 'quota_request_failed',
       errorDetail: detail,
+      entitlement: buildProviderEntitlementEvidence({
+        normalizedTier: 'unknown',
+        source: 'runtime_inference',
+        confidence: 'low',
+        accessState: 'unknown',
+        capacityState: 'unknown',
+      }),
     };
   }
 
@@ -292,6 +342,13 @@ function buildAntigravityFailure(
     error: 'Quota request failed',
     errorCode: 'quota_request_failed',
     errorDetail: detail,
+    entitlement: buildProviderEntitlementEvidence({
+      normalizedTier: 'unknown',
+      source: 'runtime_inference',
+      confidence: 'low',
+      accessState: 'unknown',
+      capacityState: 'unknown',
+    }),
   };
 }
 
@@ -581,6 +638,14 @@ async function getProjectId(accountId: string, accessToken: string): Promise<Pro
       errorCode: 'account_unprovisioned',
       actionHint: 'Complete sign-in in the Antigravity app, then retry quota refresh.',
       isUnprovisioned: true,
+      entitlement: buildProviderEntitlementEvidence({
+        normalizedTier: 'unknown',
+        source: 'runtime_inference',
+        confidence: 'medium',
+        accessState: 'unknown',
+        capacityState: 'unknown',
+        notes: 'Project provisioning is incomplete for this account.',
+      }),
     };
   }
 
@@ -880,6 +945,10 @@ export async function fetchAllProviderQuotas(
 
   return results;
 }
+
+export const __testExports = {
+  buildAntigravityFailure,
+};
 
 /**
  * Find available account with remaining quota
