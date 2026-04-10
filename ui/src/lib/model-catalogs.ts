@@ -936,36 +936,44 @@ export function getSupplementalCatalogModels(
       .map((modelId) => normalizeModelId(modelId))
   );
   const seenCanonicalIds = new Set<string>();
-  const normalizedAvailableIds = new Set(
-    availableModels.map((model) => normalizeModelId(stripManagedModelPrefix(model.id)))
-  );
+  const normalizedRawIds = new Set(availableModels.map((model) => normalizeModelId(model.id)));
 
   return availableModels.filter((availableModel) => {
+    const normalizedAvailableModelId = normalizeModelId(availableModel.id);
     const strippedModelId = stripManagedModelPrefix(availableModel.id);
     const baseModelId = stripCustomtoolsSuffix(strippedModelId);
     const matchedModel =
       findCatalogModelInCatalog(staticCatalog, strippedModelId) ??
       findCatalogModelInCatalog(staticCatalog, baseModelId);
 
-    if (!matchedModel) return false;
-
     if (recommendedIds.has(normalizeModelId(strippedModelId))) {
       return false;
     }
 
-    const canonicalId = normalizeModelId(matchedModel.id);
-    if (recommendedCanonicalIds.has(canonicalId)) {
-      return false;
-    }
-    if (seenCanonicalIds.has(canonicalId)) {
+    if (
+      normalizedAvailableModelId !== normalizeModelId(strippedModelId) &&
+      normalizedRawIds.has(normalizeModelId(strippedModelId))
+    ) {
       return false;
     }
 
     const normalizedBaseModelId = normalizeModelId(baseModelId);
     if (
       normalizedBaseModelId !== normalizeModelId(strippedModelId) &&
-      normalizedAvailableIds.has(normalizedBaseModelId)
+      normalizedRawIds.has(normalizedBaseModelId)
     ) {
+      return false;
+    }
+
+    const canonicalId = matchedModel ? normalizeModelId(matchedModel.id) : normalizedBaseModelId;
+    if (matchedModel && recommendedCanonicalIds.has(canonicalId)) {
+      return false;
+    }
+    if (seenCanonicalIds.has(canonicalId)) {
+      return false;
+    }
+
+    if (!matchedModel && normalizedProvider === 'agy') {
       return false;
     }
 

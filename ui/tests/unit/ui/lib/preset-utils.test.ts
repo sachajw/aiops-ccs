@@ -173,6 +173,14 @@ describe('claude preset utils', () => {
     );
   });
 
+  it('preserves newly advertised non-Antigravity models in the supplemental list', () => {
+    const supplementalCodexModels = getSupplementalCatalogModels('codex', MODEL_CATALOGS.codex, [
+      { id: 'gpt-5.9-codex', owned_by: 'openai' },
+    ]);
+
+    expect(supplementalCodexModels).toEqual([{ id: 'gpt-5.9-codex', owned_by: 'openai' }]);
+  });
+
   it('does not silently swap Gemini Flash presets to flash-lite', () => {
     const availableModels = [{ id: 'gemini-3.1-flash-lite-preview', owned_by: 'google' }];
 
