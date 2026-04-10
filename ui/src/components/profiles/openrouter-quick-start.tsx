@@ -110,47 +110,50 @@ function QuickStartCard({
 
 function getLocalRuntimeCardState(
   runtime: LocalRuntimeView | undefined,
-  label: string
+  label: string,
+  t: (key: string, options?: Record<string, unknown>) => string
 ): LocalRuntimeCardState {
   if (!runtime) {
     return {
-      badge: 'Checking',
+      badge: t('openrouterQuickStart.localRuntimeCheckingBadge'),
       badgeClassName: 'bg-muted text-muted-foreground',
-      actionLabel: `Set up ${label}`,
-      description: 'Checking the local runtime status before showing setup guidance.',
-      footer: 'Checking the local runtime...',
+      actionLabel: t('openrouterQuickStart.localRuntimeSetupAction', { label }),
+      description: t('openrouterQuickStart.localRuntimeCheckingDescription'),
+      footer: t('openrouterQuickStart.localRuntimeCheckingFooter'),
     };
   }
 
   if (runtime.status === 'ready') {
     return {
-      badge: 'Ready',
+      badge: t('openrouterQuickStart.localRuntimeReadyBadge'),
       badgeClassName:
         'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
-      actionLabel: `Use ${label}`,
-      description: 'Best for private prompts, offline workflows, and cheaper batch transforms.',
-      footer: `Endpoint ready at ${runtime.endpoint}`,
+      actionLabel: t('openrouterQuickStart.localRuntimeUseAction', { label }),
+      description: t('openrouterQuickStart.localRuntimeReadyDescription'),
+      footer: t('openrouterQuickStart.localRuntimeReadyFooter', { endpoint: runtime.endpoint }),
     };
   }
 
   if (runtime.status === 'missing-model') {
     return {
-      badge: 'Needs model',
+      badge: t('openrouterQuickStart.localRuntimeNeedsModelBadge'),
       badgeClassName: 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
-      actionLabel: `Finish ${label} setup`,
-      description:
-        'The runtime is up, but the recommended local model still needs to be pulled or loaded.',
-      footer: `Run \`${runtime.commandHint}\` to finish local setup.`,
+      actionLabel: t('openrouterQuickStart.localRuntimeFinishAction', { label }),
+      description: t('openrouterQuickStart.localRuntimeNeedsModelDescription'),
+      footer: t('openrouterQuickStart.localRuntimeMissingModelFooter', {
+        command: runtime.commandHint,
+      }),
     };
   }
 
   return {
-    badge: 'Offline',
+    badge: t('openrouterQuickStart.localRuntimeOfflineBadge'),
     badgeClassName: 'bg-muted text-muted-foreground',
-    actionLabel: `Set up ${label}`,
-    description:
-      'Use this lane for privacy-sensitive work, cheap local transforms, and offline sessions.',
-    footer: `Run \`${runtime.commandHint}\` to bring the local endpoint online.`,
+    actionLabel: t('openrouterQuickStart.localRuntimeSetupAction', { label }),
+    description: t('openrouterQuickStart.localRuntimeOfflineDescription'),
+    footer: t('openrouterQuickStart.localRuntimeOfflineFooter', {
+      command: runtime.commandHint,
+    }),
   };
 }
 
@@ -169,18 +172,26 @@ export function OpenRouterQuickStart({
   const { data: localRuntimeData } = useLocalRuntimeReadiness();
   const modelCountLabel = isLoading ? '300+' : `${modelCount}+`;
   const profileSummaryLabel = hasProfiles
-    ? `${profileCount} ${profileCount === 1 ? 'profile' : 'profiles'}`
-    : 'Premium quality + local control';
+    ? t('openrouterQuickStart.profileSummaryCount', { count: profileCount })
+    : t('openrouterQuickStart.profileSummaryEmpty');
   const summaryTitle = hasProfiles
-    ? 'Choose a profile or add another lane'
-    : 'Choose your first profile lane';
+    ? t('openrouterQuickStart.summaryExistingTitle')
+    : t('openrouterQuickStart.summaryEmptyTitle');
   const summaryDescription = hasProfiles
-    ? `You already have ${profileCount} profile${profileCount === 1 ? '' : 's'} in this workspace. Keep premium-quality providers for serious coding and add local runtimes when privacy, cost, or offline work matters.`
-    : 'Pick the lane that matches the work. Premium providers stay the default for reliable coding. Local runtimes are best for privacy, cheaper transforms, and experimentation.';
+    ? t('openrouterQuickStart.summaryExistingDescription', { count: profileCount })
+    : t('openrouterQuickStart.summaryEmptyDescription');
   const ollamaRuntime = localRuntimeData?.runtimes.find((runtime) => runtime.id === 'ollama');
   const llamacppRuntime = localRuntimeData?.runtimes.find((runtime) => runtime.id === 'llamacpp');
-  const ollamaCardState = getLocalRuntimeCardState(ollamaRuntime, 'Ollama');
-  const llamacppCardState = getLocalRuntimeCardState(llamacppRuntime, 'llama.cpp');
+  const ollamaCardState = getLocalRuntimeCardState(
+    ollamaRuntime,
+    t('openrouterQuickStart.localOllamaLabel'),
+    t
+  );
+  const llamacppCardState = getLocalRuntimeCardState(
+    llamacppRuntime,
+    t('openrouterQuickStart.localLlamacppLabel'),
+    t
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-auto bg-muted/20 p-4 sm:p-6">
@@ -190,8 +201,10 @@ export function OpenRouterQuickStart({
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary">{profileSummaryLabel}</Badge>
-                <Badge variant="outline">Best quality by default</Badge>
-                <Badge variant="outline">Local lane when task fit wins</Badge>
+                <Badge variant="outline">
+                  {t('openrouterQuickStart.summaryBadgeDefaultQuality')}
+                </Badge>
+                <Badge variant="outline">{t('openrouterQuickStart.summaryBadgeLocalLane')}</Badge>
               </div>
               <div className="space-y-1">
                 <h2 className="text-xl font-semibold">{summaryTitle}</h2>
@@ -210,7 +223,7 @@ export function OpenRouterQuickStart({
           <div className="flex items-center gap-2">
             <BrainCircuit className="h-4 w-4 text-accent" />
             <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-foreground/70">
-              Best quality lanes
+              {t('openrouterQuickStart.qualityLanesTitle')}
             </h3>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
@@ -230,7 +243,7 @@ export function OpenRouterQuickStart({
                 },
                 {
                   icon: <Sparkles className="h-3.5 w-3.5 text-accent" />,
-                  label: 'Best default lane for high-stakes coding quality',
+                  label: t('openrouterQuickStart.qualityLaneHighlightDefaultQuality'),
                 },
               ]}
               actionLabel={t('openrouterQuickStart.createOpenRouterProfile')}
@@ -256,7 +269,7 @@ export function OpenRouterQuickStart({
               badge={t('alibabaCodingPlanQuickStart.recommended')}
               badgeClassName="bg-orange-500/10 text-orange-700 dark:bg-orange-500/20 dark:text-orange-200"
               title={t('alibabaCodingPlanQuickStart.title')}
-              description="Strong direct coding profile when you want a dedicated premium lane outside the OpenRouter catalog."
+              description={t('openrouterQuickStart.alibabaLaneDescription')}
               visual={
                 <div className="rounded-lg bg-orange-500/10 p-2">
                   <img
@@ -273,7 +286,7 @@ export function OpenRouterQuickStart({
                 },
                 {
                   icon: <KeyRound className="h-3.5 w-3.5 text-orange-600" />,
-                  label: 'Good when you want premium quality with a dedicated endpoint',
+                  label: t('openrouterQuickStart.alibabaLaneHighlightQuality'),
                 },
               ]}
               actionLabel={t('alibabaCodingPlanQuickStart.createAlibabaProfile')}
@@ -301,14 +314,14 @@ export function OpenRouterQuickStart({
           <div className="flex items-center gap-2">
             <Laptop className="h-4 w-4 text-emerald-600" />
             <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-foreground/70">
-              Local runtimes
+              {t('openrouterQuickStart.localRuntimesTitle')}
             </h3>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <QuickStartCard
               badge={ollamaCardState.badge}
               badgeClassName={ollamaCardState.badgeClassName}
-              title="Ollama + Gemma 4"
+              title={t('openrouterQuickStart.localOllamaTitle')}
               description={ollamaCardState.description}
               visual={
                 <div className="rounded-lg bg-emerald-500/10 p-2">
@@ -318,14 +331,16 @@ export function OpenRouterQuickStart({
               highlights={[
                 {
                   icon: <HardDriveDownload className="h-3.5 w-3.5 text-emerald-600" />,
-                  label: 'Best for private prompts, local cleanup, and cheap batch transforms',
+                  label: t('openrouterQuickStart.localOllamaHighlight'),
                 },
                 {
                   icon: <Sparkles className="h-3.5 w-3.5 text-emerald-600" />,
                   label:
                     ollamaRuntime?.detectedModelCount && ollamaRuntime.detectedModelCount > 0
-                      ? `${ollamaRuntime.detectedModelCount} local model${ollamaRuntime.detectedModelCount === 1 ? '' : 's'} detected`
-                      : 'No local models detected yet',
+                      ? t('openrouterQuickStart.localDetectedModels', {
+                          count: ollamaRuntime.detectedModelCount,
+                        })
+                      : t('openrouterQuickStart.localNoModelsDetected'),
                 },
               ]}
               actionLabel={ollamaCardState.actionLabel}
@@ -337,7 +352,7 @@ export function OpenRouterQuickStart({
             <QuickStartCard
               badge={llamacppCardState.badge}
               badgeClassName={llamacppCardState.badgeClassName}
-              title="llama.cpp"
+              title={t('openrouterQuickStart.localLlamacppTitle')}
               description={llamacppCardState.description}
               visual={
                 <div className="rounded-lg bg-sky-500/10 p-2">
@@ -347,14 +362,16 @@ export function OpenRouterQuickStart({
               highlights={[
                 {
                   icon: <SlidersHorizontal className="h-3.5 w-3.5 text-sky-600" />,
-                  label: 'Best for custom GGUF setups and advanced self-hosted local workflows',
+                  label: t('openrouterQuickStart.localLlamacppHighlight'),
                 },
                 {
                   icon: <Laptop className="h-3.5 w-3.5 text-sky-600" />,
                   label:
                     llamacppRuntime?.detectedModelCount && llamacppRuntime.detectedModelCount > 0
-                      ? `${llamacppRuntime.detectedModelCount} local model${llamacppRuntime.detectedModelCount === 1 ? '' : 's'} detected`
-                      : 'Waiting for a local server and model list',
+                      ? t('openrouterQuickStart.localDetectedModels', {
+                          count: llamacppRuntime.detectedModelCount,
+                        })
+                      : t('openrouterQuickStart.localWaitingServer'),
                 },
               ]}
               actionLabel={llamacppCardState.actionLabel}
@@ -370,7 +387,7 @@ export function OpenRouterQuickStart({
             badge={t('openrouterQuickStart.runtimeProviderBadge')}
             badgeClassName="bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200"
             title={t('openrouterQuickStart.runtimeProviderTitle')}
-            description="Use this when you need CLIProxy-managed connectors, provider secrets, and advanced routing controls."
+            description={t('openrouterQuickStart.runtimeProviderManagedDescription')}
             visual={
               <div className="rounded-lg bg-emerald-500/10 p-2">
                 <SlidersHorizontal className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />

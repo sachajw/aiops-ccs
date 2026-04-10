@@ -18,6 +18,7 @@ interface LocalRuntimeDefinition {
   endpoint: string;
   modelsUrl: string;
   commandHint: string;
+  pullCommandHint?: string;
   recommendedModel: string | null;
   parseModelIds: (payload: unknown) => string[];
 }
@@ -29,6 +30,7 @@ const LOCAL_RUNTIME_DEFINITIONS: LocalRuntimeDefinition[] = [
     endpoint: 'http://127.0.0.1:11434',
     modelsUrl: 'http://127.0.0.1:11434/api/tags',
     commandHint: 'ollama serve',
+    pullCommandHint: 'ollama pull',
     recommendedModel: 'gemma4:e4b',
     parseModelIds: (payload) => {
       const models = (payload as { models?: Array<{ name?: string }> })?.models;
@@ -86,8 +88,8 @@ function toReadiness(
     endpoint: definition.endpoint,
     status,
     commandHint:
-      status === 'missing-model' && definition.recommendedModel
-        ? `ollama pull ${definition.recommendedModel}`
+      status === 'missing-model' && definition.recommendedModel && definition.pullCommandHint
+        ? `${definition.pullCommandHint} ${definition.recommendedModel}`
         : definition.commandHint,
     recommendedModel: definition.recommendedModel,
     recommendedModelInstalled,

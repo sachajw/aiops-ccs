@@ -21,6 +21,7 @@ vi.mock('@/hooks/use-local-runtime-readiness', () => ({
           commandHint: 'ollama serve',
           recommendedModel: 'gemma4:e4b',
           recommendedModelInstalled: false,
+          detectedModelCount: 0,
         },
         {
           id: 'llamacpp',
@@ -29,6 +30,7 @@ vi.mock('@/hooks/use-local-runtime-readiness', () => ({
           commandHint: './server --host 0.0.0.0 --port 8080 -m model.gguf',
           recommendedModel: null,
           recommendedModelInstalled: true,
+          detectedModelCount: 1,
         },
       ],
     },
@@ -73,6 +75,8 @@ describe('OpenRouterQuickStart', () => {
       screen.getByText('Run `ollama serve` to bring the local endpoint online.')
     ).toBeInTheDocument();
     expect(screen.getByText('Endpoint ready at http://127.0.0.1:8080')).toBeInTheDocument();
+    expect(screen.getByText('No local models detected yet')).toBeInTheDocument();
+    expect(screen.getByText('1 local model detected')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Set up Ollama' }));
     expect(props.onOllamaClick).toHaveBeenCalledTimes(1);
