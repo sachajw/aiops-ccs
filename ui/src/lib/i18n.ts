@@ -19,7 +19,7 @@ const resources = {
         home: 'Home',
         analytics: 'Analytics',
         identityAccess: 'Identity & Access',
-        apiProfiles: 'API Profiles',
+        apiProfiles: 'Profiles',
         cliproxyPlus: 'CLIProxy Plus',
         cliproxyOverview: 'Overview',
         controlPanel: 'Control Panel',
@@ -269,21 +269,59 @@ const resources = {
         description:
           'Access {{modelCountLabel}} models from OpenAI, Anthropic, Google, Meta and more - all through one API.',
         featureOneApi: 'One API, all providers',
-        featureTierMapping: 'Model tier mapping',
-        profileCount: '{{count}} profile',
-        profileCount_other: '{{count}} profiles',
-        selectProfileTitle: 'Select an API profile',
-        summaryDescriptionWithProfiles:
-          'You already have {{count}} profile in this workspace. Select one from the left rail to edit it, or create another profile from here.',
-        summaryDescriptionWithProfiles_other:
-          'You already have {{count}} profiles in this workspace. Select one from the left rail to edit it, or create another profile from here.',
-        summaryDescriptionNoProfiles:
-          'Use API Profiles for Anthropic-compatible endpoints. Use AI Providers for Gemini, Codex, Claude, Vertex, and OpenAI-compatible connectors.',
-        openrouterModelsBadge: '{{modelCountLabel}} OpenRouter models',
+        profileSummaryCount: '{{count}} profile',
+        profileSummaryCount_other: '{{count}} profiles',
+        profileSummaryEmpty: 'Premium quality + local control',
+        summaryBadgeDefaultQuality: 'Best quality by default',
+        summaryBadgeLocalLane: 'Local lane when task fit wins',
+        summaryExistingTitle: 'Choose a profile or add another lane',
+        summaryEmptyTitle: 'Choose your first profile lane',
+        summaryExistingDescription:
+          'You already have {{count}} profile in this workspace. Keep premium-quality providers for serious coding and add local runtimes when privacy, cost, or offline work matters.',
+        summaryExistingDescription_other:
+          'You already have {{count}} profiles in this workspace. Keep premium-quality providers for serious coding and add local runtimes when privacy, cost, or offline work matters.',
+        summaryEmptyDescription:
+          'Pick the lane that matches the work. Premium providers stay the default for reliable coding. Local runtimes are best for privacy, cheaper transforms, and experimentation.',
+        qualityLanesTitle: 'Best quality lanes',
+        qualityLaneHighlightDefaultQuality: 'Best default lane for high-stakes coding quality',
+        alibabaLaneDescription:
+          'Strong direct coding profile when you want a dedicated premium lane outside the OpenRouter catalog.',
+        alibabaLaneHighlightQuality: 'Good when you want premium quality with a dedicated endpoint',
+        localRuntimesTitle: 'Local runtimes',
+        localOllamaTitle: 'Ollama + Gemma 4',
+        localOllamaLabel: 'Ollama',
+        localOllamaHighlight: 'Best for private prompts, local cleanup, and cheap batch transforms',
+        localLlamacppTitle: 'llama.cpp',
+        localLlamacppLabel: 'llama.cpp',
+        localLlamacppHighlight:
+          'Best for custom GGUF setups and advanced self-hosted local workflows',
+        localDetectedModels: '{{count}} local model detected',
+        localDetectedModels_other: '{{count}} local models detected',
+        localNoModelsDetected: 'No local models detected yet',
+        localWaitingServer: 'Waiting for a local server and model list',
+        localRuntimeCheckingBadge: 'Checking',
+        localRuntimeReadyBadge: 'Ready',
+        localRuntimeNeedsModelBadge: 'Needs model',
+        localRuntimeOfflineBadge: 'Offline',
+        localRuntimeCheckingDescription:
+          'Checking the local runtime status before showing setup guidance.',
+        localRuntimeReadyDescription:
+          'Best for private prompts, offline workflows, and cheaper batch transforms.',
+        localRuntimeNeedsModelDescription:
+          'The runtime is up, but the recommended local model still needs to be pulled or loaded.',
+        localRuntimeOfflineDescription:
+          'Use this lane for privacy-sensitive work, cheap local transforms, and offline sessions.',
+        localRuntimeCheckingFooter: 'Checking the local runtime...',
+        localRuntimeReadyFooter: 'Endpoint ready at {{endpoint}}',
+        localRuntimeMissingModelFooter: 'Run `{{command}}` to finish local setup.',
+        localRuntimeOfflineFooter: 'Run `{{command}}` to bring the local endpoint online.',
+        localRuntimeSetupAction: 'Set up {{label}}',
+        localRuntimeUseAction: 'Use {{label}}',
+        localRuntimeFinishAction: 'Finish {{label}} setup',
         runtimeProviderBadge: 'Runtime provider setup',
         runtimeProviderTitle: 'Open AI Providers',
-        runtimeProviderDescription:
-          'Manage shared provider keys and runtime connectors before creating standalone API Profiles.',
+        runtimeProviderManagedDescription:
+          'Use this when you need CLIProxy-managed connectors, provider secrets, and advanced routing controls.',
         runtimeProviderFeatureConnectors:
           'Gemini, Codex, Claude, Vertex, and OpenAI-compatible connectors',
         runtimeProviderFeatureSecrets: 'Shared secrets stay outside individual API profiles',
@@ -291,7 +329,6 @@ const resources = {
           'Best when multiple profiles should share one provider configuration.',
         createOpenRouterProfile: 'Create OpenRouter Profile',
         getApiKeyAt: 'Get your API key at',
-        or: 'or',
         createCustomProfile: 'Create Custom API Profile',
       },
       alibabaCodingPlanQuickStart: {
@@ -1017,7 +1054,7 @@ const resources = {
         tokensSubtitle: '{{value}} tokens',
       },
       apiProfiles: {
-        title: 'API Profiles',
+        title: 'Profiles',
         new: 'New',
         searchPlaceholder: 'Search profiles...',
         loadingProfiles: 'Loading profiles...',
@@ -1628,26 +1665,59 @@ const resources = {
         description:
           '通过一个 API 即可访问来自 OpenAI、Anthropic、Google、Meta 等的 {{modelCountLabel}} 个模型。',
         featureOneApi: '一个 API，接入全部提供商',
-        featureTierMapping: '模型档位映射',
-        profileCount: '{{count}} 个 API 配置',
-        profileCount_other: '{{count}} 个 API 配置',
-        selectProfileTitle: '选择一个 API 配置',
-        summaryDescriptionWithProfiles:
-          '此工作区中已存在 {{count}} 个 API 配置。请从左侧栏选择一个进行编辑，或在此继续创建新的配置。',
-        summaryDescriptionWithProfiles_other:
-          '此工作区中已存在 {{count}} 个 API 配置。请从左侧栏选择一个进行编辑，或在此继续创建新的配置。',
-        summaryDescriptionNoProfiles:
-          'API 配置适用于 Anthropic 兼容端点。AI Providers 适用于 Gemini、Codex、Claude、Vertex 以及 OpenAI 兼容连接器。',
-        openrouterModelsBadge: '{{modelCountLabel}} 个 OpenRouter 模型',
+        profileSummaryCount: '{{count}} 个配置',
+        profileSummaryCount_other: '{{count}} 个配置',
+        profileSummaryEmpty: '高级质量 + 本地控制',
+        summaryBadgeDefaultQuality: '默认最佳质量',
+        summaryBadgeLocalLane: '任务合适时使用本地通道',
+        summaryExistingTitle: '选择一个配置，或添加新的通道',
+        summaryEmptyTitle: '选择你的第一条配置通道',
+        summaryExistingDescription:
+          '此工作区中已存在 {{count}} 个配置。对于严肃编码工作请优先使用高质量提供商，而在隐私、成本或离线场景下再增加本地运行时。',
+        summaryExistingDescription_other:
+          '此工作区中已存在 {{count}} 个配置。对于严肃编码工作请优先使用高质量提供商，而在隐私、成本或离线场景下再增加本地运行时。',
+        summaryEmptyDescription:
+          '根据任务选择通道。高级提供商仍是可靠编码的默认选择；本地运行时更适合隐私、低成本转换和实验。',
+        qualityLanesTitle: '高质量通道',
+        qualityLaneHighlightDefaultQuality: '高风险编码任务的默认最佳通道',
+        alibabaLaneDescription:
+          '当你想要一个独立于 OpenRouter 目录之外的高级编码通道时，这是一个强力的直连配置。',
+        alibabaLaneHighlightQuality: '适合需要独立端点的高级质量场景',
+        localRuntimesTitle: '本地运行时',
+        localOllamaTitle: 'Ollama + Gemma 4',
+        localOllamaLabel: 'Ollama',
+        localOllamaHighlight: '最适合隐私敏感提示、本地清理和低成本批处理转换',
+        localLlamacppTitle: 'llama.cpp',
+        localLlamacppLabel: 'llama.cpp',
+        localLlamacppHighlight: '最适合自定义 GGUF 部署和高级自托管本地工作流',
+        localDetectedModels: '已检测到 {{count}} 个本地模型',
+        localDetectedModels_other: '已检测到 {{count}} 个本地模型',
+        localNoModelsDetected: '尚未检测到本地模型',
+        localWaitingServer: '正在等待本地服务和模型列表',
+        localRuntimeCheckingBadge: '检测中',
+        localRuntimeReadyBadge: '就绪',
+        localRuntimeNeedsModelBadge: '缺少模型',
+        localRuntimeOfflineBadge: '离线',
+        localRuntimeCheckingDescription: '正在检查本地运行时状态，然后再显示设置引导。',
+        localRuntimeReadyDescription: '最适合私有提示、离线工作流和更便宜的批量转换。',
+        localRuntimeNeedsModelDescription: '运行时已启动，但推荐的本地模型仍需要拉取或加载。',
+        localRuntimeOfflineDescription: '这个通道适合隐私敏感工作、低成本本地转换和离线会话。',
+        localRuntimeCheckingFooter: '正在检查本地运行时...',
+        localRuntimeReadyFooter: '端点已就绪：{{endpoint}}',
+        localRuntimeMissingModelFooter: '运行 `{{command}}` 完成本地设置。',
+        localRuntimeOfflineFooter: '运行 `{{command}}` 启动本地端点。',
+        localRuntimeSetupAction: '设置 {{label}}',
+        localRuntimeUseAction: '使用 {{label}}',
+        localRuntimeFinishAction: '完成 {{label}} 设置',
         runtimeProviderBadge: '运行时提供商设置',
         runtimeProviderTitle: '打开 AI Providers',
-        runtimeProviderDescription: '先管理共享的提供商密钥和运行时连接器，再创建独立的 API 配置。',
+        runtimeProviderManagedDescription:
+          '当你需要 CLIProxy 管理的连接器、提供商密钥和高级路由控制时使用这里。',
         runtimeProviderFeatureConnectors: 'Gemini、Codex、Claude、Vertex 以及 OpenAI 兼容连接器',
         runtimeProviderFeatureSecrets: '共享密钥与单个 API 配置分离存放',
         runtimeProviderFooter: '当多个配置需要共享同一提供商设置时最适合使用。',
         createOpenRouterProfile: '创建 OpenRouter 配置',
         getApiKeyAt: '在此获取 API Key：',
-        or: '或',
         createCustomProfile: '创建自定义 API 配置',
       },
       alibabaCodingPlanQuickStart: {
@@ -2940,21 +3010,60 @@ const resources = {
         description:
           'Truy cập các mô hình {{modelCountLabel}} từ OpenAI, Anthropic, Google, Meta, v.v. - tất cả đều thông qua một API.',
         featureOneApi: 'Một API cho mọi nhà cung cấp',
-        featureTierMapping: 'Ánh xạ tầng mô hình',
-        profileCount: '{{count}} hồ sơ',
-        profileCount_other: '{{count}} hồ sơ',
-        selectProfileTitle: 'Chọn một hồ sơ API',
-        summaryDescriptionWithProfiles:
-          'Bạn đã có {{count}} hồ sơ trong workspace này. Chọn một hồ sơ ở thanh bên trái để chỉnh sửa, hoặc tạo thêm hồ sơ mới tại đây.',
-        summaryDescriptionWithProfiles_other:
-          'Bạn đã có {{count}} hồ sơ trong workspace này. Chọn một hồ sơ ở thanh bên trái để chỉnh sửa, hoặc tạo thêm hồ sơ mới tại đây.',
-        summaryDescriptionNoProfiles:
-          'Dùng API Profiles cho các endpoint tương thích Anthropic. Dùng AI Providers cho Gemini, Codex, Claude, Vertex và các connector tương thích OpenAI.',
-        openrouterModelsBadge: '{{modelCountLabel}} mô hình OpenRouter',
+        profileSummaryCount: '{{count}} hồ sơ',
+        profileSummaryCount_other: '{{count}} hồ sơ',
+        profileSummaryEmpty: 'Chất lượng cao + kiểm soát cục bộ',
+        summaryBadgeDefaultQuality: 'Mặc định chất lượng tốt nhất',
+        summaryBadgeLocalLane: 'Dùng local khi đúng bài toán',
+        summaryExistingTitle: 'Chọn hồ sơ hoặc thêm một lane mới',
+        summaryEmptyTitle: 'Chọn lane hồ sơ đầu tiên của bạn',
+        summaryExistingDescription:
+          'Bạn đã có {{count}} hồ sơ trong workspace này. Hãy giữ các nhà cung cấp chất lượng cao cho công việc code nghiêm túc, và chỉ thêm runtime local khi cần quyền riêng tư, chi phí thấp hoặc làm việc offline.',
+        summaryExistingDescription_other:
+          'Bạn đã có {{count}} hồ sơ trong workspace này. Hãy giữ các nhà cung cấp chất lượng cao cho công việc code nghiêm túc, và chỉ thêm runtime local khi cần quyền riêng tư, chi phí thấp hoặc làm việc offline.',
+        summaryEmptyDescription:
+          'Chọn lane phù hợp với công việc. Nhà cung cấp premium vẫn là mặc định cho độ tin cậy khi code; runtime local phù hợp hơn cho quyền riêng tư, batch rẻ và thử nghiệm.',
+        qualityLanesTitle: 'Lane chất lượng cao',
+        qualityLaneHighlightDefaultQuality: 'Lane mặc định tốt nhất cho các tác vụ code quan trọng',
+        alibabaLaneDescription:
+          'Hồ sơ coding trực tiếp mạnh mẽ khi bạn muốn một lane premium riêng ngoài catalog OpenRouter.',
+        alibabaLaneHighlightQuality: 'Phù hợp khi bạn cần chất lượng premium với endpoint riêng',
+        localRuntimesTitle: 'Runtime local',
+        localOllamaTitle: 'Ollama + Gemma 4',
+        localOllamaLabel: 'Ollama',
+        localOllamaHighlight:
+          'Tốt nhất cho prompt riêng tư, dọn dẹp local và batch transform chi phí thấp',
+        localLlamacppTitle: 'llama.cpp',
+        localLlamacppLabel: 'llama.cpp',
+        localLlamacppHighlight:
+          'Tốt nhất cho thiết lập GGUF tùy biến và workflow local tự host nâng cao',
+        localDetectedModels: 'Đã phát hiện {{count}} mô hình local',
+        localDetectedModels_other: 'Đã phát hiện {{count}} mô hình local',
+        localNoModelsDetected: 'Chưa phát hiện mô hình local nào',
+        localWaitingServer: 'Đang chờ máy chủ local và danh sách mô hình',
+        localRuntimeCheckingBadge: 'Đang kiểm tra',
+        localRuntimeReadyBadge: 'Sẵn sàng',
+        localRuntimeNeedsModelBadge: 'Thiếu mô hình',
+        localRuntimeOfflineBadge: 'Ngoại tuyến',
+        localRuntimeCheckingDescription:
+          'Đang kiểm tra trạng thái runtime local trước khi hiển thị hướng dẫn thiết lập.',
+        localRuntimeReadyDescription:
+          'Phù hợp nhất cho prompt riêng tư, workflow offline và batch transform rẻ hơn.',
+        localRuntimeNeedsModelDescription:
+          'Runtime đã chạy, nhưng mô hình local được khuyến nghị vẫn cần được tải hoặc nạp.',
+        localRuntimeOfflineDescription:
+          'Lane này phù hợp cho công việc nhạy cảm về riêng tư, transform local giá rẻ và phiên offline.',
+        localRuntimeCheckingFooter: 'Đang kiểm tra runtime local...',
+        localRuntimeReadyFooter: 'Endpoint sẵn sàng tại {{endpoint}}',
+        localRuntimeMissingModelFooter: 'Chạy `{{command}}` để hoàn tất thiết lập local.',
+        localRuntimeOfflineFooter: 'Chạy `{{command}}` để đưa endpoint local lên.',
+        localRuntimeSetupAction: 'Thiết lập {{label}}',
+        localRuntimeUseAction: 'Dùng {{label}}',
+        localRuntimeFinishAction: 'Hoàn tất thiết lập {{label}}',
         runtimeProviderBadge: 'Thiết lập nhà cung cấp runtime',
         runtimeProviderTitle: 'Mở AI Providers',
-        runtimeProviderDescription:
-          'Quản lý khóa nhà cung cấp dùng chung và các connector runtime trước khi tạo API Profiles độc lập.',
+        runtimeProviderManagedDescription:
+          'Dùng mục này khi bạn cần connector do CLIProxy quản lý, secret nhà cung cấp và điều khiển routing nâng cao.',
         runtimeProviderFeatureConnectors:
           'Gemini, Codex, Claude, Vertex và các connector tương thích OpenAI',
         runtimeProviderFeatureSecrets: 'Khóa dùng chung tách biệt khỏi từng API Profile',
@@ -2962,7 +3071,6 @@ const resources = {
           'Phù hợp nhất khi nhiều hồ sơ cần dùng chung một cấu hình nhà cung cấp.',
         createOpenRouterProfile: 'Tạo hồ sơ OpenRouter',
         getApiKeyAt: 'Nhận khóa API của bạn tại',
-        or: 'hoặc',
         createCustomProfile: 'Tạo hồ sơ API tùy chỉnh',
       },
       alibabaCodingPlanQuickStart: {
@@ -4329,21 +4437,61 @@ const resources = {
         description:
           'OpenAI、Anthropic、Google、Meta などの {{modelCountLabel}} モデルを、1 つの API で利用できます。',
         featureOneApi: '1 つの API で全プロバイダー',
-        featureTierMapping: 'モデルティアマッピング',
-        profileCount: '{{count}} 個の API プロファイル',
-        profileCount_other: '{{count}} 個の API プロファイル',
-        selectProfileTitle: 'API プロファイルを選択',
-        summaryDescriptionWithProfiles:
-          'このワークスペースには既に {{count}} 個の API プロファイルがあります。左側レールから 1 つ選んで編集するか、ここから新しいプロファイルを作成してください。',
-        summaryDescriptionWithProfiles_other:
-          'このワークスペースには既に {{count}} 個の API プロファイルがあります。左側レールから 1 つ選んで編集するか、ここから新しいプロファイルを作成してください。',
-        summaryDescriptionNoProfiles:
-          'API Profiles は Anthropic 互換エンドポイント向けです。AI Providers は Gemini、Codex、Claude、Vertex、OpenAI 互換コネクタ向けです。',
-        openrouterModelsBadge: '{{modelCountLabel}} 個の OpenRouter モデル',
+        profileSummaryCount: '{{count}} 件のプロファイル',
+        profileSummaryCount_other: '{{count}} 件のプロファイル',
+        profileSummaryEmpty: '高品質 + ローカル制御',
+        summaryBadgeDefaultQuality: '既定で最高品質',
+        summaryBadgeLocalLane: 'タスクに合うときだけ local を使う',
+        summaryExistingTitle: 'プロファイルを選ぶか、新しいレーンを追加',
+        summaryEmptyTitle: '最初のプロファイルレーンを選択',
+        summaryExistingDescription:
+          'このワークスペースには既に {{count}} 件のプロファイルがあります。重要なコーディング作業には高品質プロバイダーを使い、プライバシー・コスト・オフライン要件があるときだけローカルランタイムを追加してください。',
+        summaryExistingDescription_other:
+          'このワークスペースには既に {{count}} 件のプロファイルがあります。重要なコーディング作業には高品質プロバイダーを使い、プライバシー・コスト・オフライン要件があるときだけローカルランタイムを追加してください。',
+        summaryEmptyDescription:
+          '作業に合うレーンを選んでください。Premium プロバイダーは信頼性の高いコーディング向けの既定値で、ローカルランタイムはプライバシー、低コスト変換、実験向けです。',
+        qualityLanesTitle: '高品質レーン',
+        qualityLaneHighlightDefaultQuality: '重要なコーディング作業向けの既定ベストレーン',
+        alibabaLaneDescription:
+          'OpenRouter カタログの外で、専用の premium コーディングレーンが欲しいときに強い直接接続プロファイルです。',
+        alibabaLaneHighlightQuality: '専用エンドポイントで premium 品質が必要なときに最適',
+        localRuntimesTitle: 'ローカルランタイム',
+        localOllamaTitle: 'Ollama + Gemma 4',
+        localOllamaLabel: 'Ollama',
+        localOllamaHighlight: 'プライベートなプロンプト、ローカル整理、低コストの一括変換に最適',
+        localLlamacppTitle: 'llama.cpp',
+        localLlamacppLabel: 'llama.cpp',
+        localLlamacppHighlight:
+          'カスタム GGUF 構成や高度なセルフホスト型ローカルワークフローに最適',
+        localDetectedModels: '{{count}} 件のローカルモデルを検出',
+        localDetectedModels_other: '{{count}} 件のローカルモデルを検出',
+        localNoModelsDetected: 'ローカルモデルはまだ検出されていません',
+        localWaitingServer: 'ローカルサーバーとモデル一覧を待機中',
+        localRuntimeCheckingBadge: '確認中',
+        localRuntimeReadyBadge: '準備完了',
+        localRuntimeNeedsModelBadge: 'モデルが必要',
+        localRuntimeOfflineBadge: 'オフライン',
+        localRuntimeCheckingDescription:
+          'セットアップ案内を表示する前に、ローカルランタイムの状態を確認しています。',
+        localRuntimeReadyDescription:
+          'プライベートなプロンプト、オフライン作業、より安価な一括変換に適しています。',
+        localRuntimeNeedsModelDescription:
+          'ランタイムは起動していますが、推奨ローカルモデルの取得または読み込みがまだ必要です。',
+        localRuntimeOfflineDescription:
+          'このレーンは、プライバシー重視の作業、安価なローカル変換、オフラインセッションに向いています。',
+        localRuntimeCheckingFooter: 'ローカルランタイムを確認しています...',
+        localRuntimeReadyFooter: '{{endpoint}} でエンドポイント準備完了',
+        localRuntimeMissingModelFooter:
+          'ローカルセットアップを完了するには `{{command}}` を実行してください。',
+        localRuntimeOfflineFooter:
+          'ローカルエンドポイントを起動するには `{{command}}` を実行してください。',
+        localRuntimeSetupAction: '{{label}} をセットアップ',
+        localRuntimeUseAction: '{{label}} を使う',
+        localRuntimeFinishAction: '{{label}} のセットアップを完了',
         runtimeProviderBadge: 'ランタイムプロバイダー設定',
         runtimeProviderTitle: 'AI Providers を開く',
-        runtimeProviderDescription:
-          '個別の API プロファイルを作成する前に、共有プロバイダーキーとランタイムコネクタを管理します。',
+        runtimeProviderManagedDescription:
+          'CLIProxy 管理のコネクタ、プロバイダーシークレット、高度なルーティング制御が必要なときに使います。',
         runtimeProviderFeatureConnectors: 'Gemini、Codex、Claude、Vertex、OpenAI 互換コネクタ',
         runtimeProviderFeatureSecrets:
           '共有シークレットを個別の API プロファイルから切り離して管理',
@@ -4351,7 +4499,6 @@ const resources = {
           '複数のプロファイルで 1 つのプロバイダー設定を共有したい場合に最適です。',
         createOpenRouterProfile: 'OpenRouter プロファイルを作成',
         getApiKeyAt: 'API キー取得:',
-        or: 'または',
         createCustomProfile: 'カスタム API プロファイルを作成',
       },
       alibabaCodingPlanQuickStart: {

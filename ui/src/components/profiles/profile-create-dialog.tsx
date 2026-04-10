@@ -80,13 +80,14 @@ interface ProfileCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (name: string) => void;
-  initialMode?: 'normal' | 'openrouter' | 'alibaba-coding-plan';
+  initialMode?: ProviderPreset['id'] | 'normal';
 }
 
 // Common URL mistakes to warn about
 const PROBLEMATIC_PATHS = ['/chat/completions', '/v1/messages', '/messages', '/completions'];
 const CUSTOM_PRESET_ID = 'custom';
 const DEFAULT_PRESET_ID: ProviderPreset['id'] = 'openrouter';
+const LOCAL_PRESET_IDS = new Set<ProviderPreset['id']>(['ollama', 'llamacpp']);
 
 const EMPTY_FORM_VALUES: FormData = {
   name: '',
@@ -100,6 +101,12 @@ const EMPTY_FORM_VALUES: FormData = {
 };
 
 const RECOMMENDED_PRESETS = getPresetsByCategory('recommended');
+const FEATURED_PREMIUM_PRESETS = RECOMMENDED_PRESETS.filter(
+  (preset) => !LOCAL_PRESET_IDS.has(preset.id)
+);
+const LOCAL_RUNTIME_PRESETS = RECOMMENDED_PRESETS.filter((preset) =>
+  LOCAL_PRESET_IDS.has(preset.id)
+);
 const QUICK_TEMPLATE_PRESETS = PROVIDER_PRESETS.filter(
   (preset) => preset.category !== 'recommended'
 );
@@ -314,7 +321,7 @@ export function ProfileCreateDialog({
                 </Label>
                 <div className="-mx-1 overflow-x-auto pb-1">
                   <div className="flex min-w-max items-stretch gap-2 px-1">
-                    {RECOMMENDED_PRESETS.map((preset) => (
+                    {FEATURED_PREMIUM_PRESETS.map((preset) => (
                       <CompactPresetCard
                         key={preset.id}
                         preset={preset}
@@ -348,6 +355,23 @@ export function ProfileCreateDialog({
                       />
                     ))}
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-medium uppercase tracking-[0.12em] text-foreground/70">
+                  Local Runtimes
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {LOCAL_RUNTIME_PRESETS.map((preset) => (
+                    <CompactPresetCard
+                      key={preset.id}
+                      preset={preset}
+                      isSelected={selectedPreset === preset.id}
+                      onClick={() => handlePresetSelect(preset.id)}
+                      density="compact"
+                    />
+                  ))}
                 </div>
               </div>
             </div>

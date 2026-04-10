@@ -34,6 +34,7 @@ import {
 import { useOpenRouterModels } from '@/hooks/use-openrouter-models';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import type { ApiProfileExportBundle, Profile } from '@/lib/api-client';
+import type { ProviderPreset } from '@/lib/provider-presets';
 import { cn } from '@/lib/utils';
 import { CopyButton } from '@/components/ui/copy-button';
 import { useTranslation } from 'react-i18next';
@@ -53,9 +54,7 @@ export function ApiPage() {
   const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createMode, setCreateMode] = useState<'normal' | 'openrouter' | 'alibaba-coding-plan'>(
-    'normal'
-  );
+  const [createMode, setCreateMode] = useState<ProviderPreset['id'] | 'normal'>('normal');
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [editorHasChanges, setEditorHasChanges] = useState(false);
   const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
@@ -211,12 +210,14 @@ export function ApiPage() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         <div className="w-80 border-r flex flex-col bg-muted/30">
           <div className="p-4 border-b bg-background">
-            <div className="flex items-center justify-between mb-3">
+            <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Server className="w-5 h-5 text-primary" />
-                <h1 className="font-semibold">{t('apiProfiles.title')}</h1>
+                <div className="min-w-0">
+                  <h1 className="font-semibold">Profiles</h1>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <Button
                   size="sm"
                   variant="outline"
@@ -250,6 +251,10 @@ export function ApiPage() {
                 </Button>
               </div>
             </div>
+
+            <p className="mb-3 text-xs leading-4 text-muted-foreground">
+              Premium APIs, local runtimes, custom endpoints
+            </p>
 
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -398,6 +403,14 @@ export function ApiPage() {
               }}
               onAlibabaCodingPlanClick={() => {
                 setCreateMode('alibaba-coding-plan');
+                setCreateDialogOpen(true);
+              }}
+              onOllamaClick={() => {
+                setCreateMode('ollama');
+                setCreateDialogOpen(true);
+              }}
+              onLlamacppClick={() => {
+                setCreateMode('llamacpp');
                 setCreateDialogOpen(true);
               }}
               onCustomClick={() => {

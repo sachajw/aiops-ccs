@@ -239,6 +239,23 @@ export interface Profile {
   cliproxyBridge?: CliproxyBridgeMetadata | null;
 }
 
+export type LocalRuntimeStatus = 'ready' | 'missing-model' | 'offline';
+
+export interface LocalRuntimeReadiness {
+  id: 'ollama' | 'llamacpp';
+  name: string;
+  endpoint: string;
+  status: LocalRuntimeStatus;
+  commandHint: string;
+  recommendedModel: string | null;
+  recommendedModelInstalled: boolean;
+  detectedModelCount: number;
+}
+
+export interface LocalRuntimeReadinessResponse {
+  runtimes: LocalRuntimeReadiness[];
+}
+
 export interface CreateProfile {
   name: string;
   baseUrl: string;
@@ -1024,6 +1041,8 @@ export interface CliproxyRestartResult {
 export const api = {
   profiles: {
     list: () => request<{ profiles: Profile[] }>('/profiles'),
+    getLocalRuntimeReadiness: () =>
+      request<LocalRuntimeReadinessResponse>('/profiles/local-runtime-readiness'),
     create: (data: CreateProfile) =>
       request('/profiles', {
         method: 'POST',

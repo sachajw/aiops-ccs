@@ -33,7 +33,7 @@ describe('ProfileCreateDialog', () => {
     mutateAsync.mockReset();
   });
 
-  it('keeps advanced presets collapsed until explicitly opened and deselects custom after choosing a template', async () => {
+  it('keeps More Presets visible by default and deselects custom after choosing a template', async () => {
     render(
       <ProfileCreateDialog
         open
@@ -44,21 +44,13 @@ describe('ProfileCreateDialog', () => {
     );
 
     expect(screen.getByText('Featured Providers')).toBeInTheDocument();
+    expect(screen.getByText('More Presets')).toBeInTheDocument();
+    expect(screen.getByText('Local Runtimes')).toBeInTheDocument();
     expect(screen.getByText('Alibaba Coding Plan')).toBeVisible();
-    const morePresetsToggle = screen.getByRole('button', { name: /More Presets/i });
-    expect(morePresetsToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(document.body.querySelectorAll('.overflow-x-auto')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.overflow-x-auto')).toHaveLength(2);
 
     const customButton = screen.getByRole('button', { name: /Custom Endpoint/i });
     await userEvent.click(customButton);
-
-    expect(morePresetsToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(document.body.querySelectorAll('.overflow-x-auto')).toHaveLength(1);
-
-    await userEvent.click(morePresetsToggle);
-
-    expect(morePresetsToggle).toHaveAttribute('aria-expanded', 'true');
-    expect(document.body.querySelectorAll('.overflow-x-auto')).toHaveLength(2);
 
     const glmButton = screen.getByText('GLM').closest('button');
     expect(glmButton).not.toBeNull();
@@ -67,10 +59,19 @@ describe('ProfileCreateDialog', () => {
     }
     await userEvent.click(glmButton);
 
-    expect(morePresetsToggle).toHaveAttribute('aria-expanded', 'true');
     await waitFor(() => {
       expect(customButton).not.toHaveClass('border-primary');
     });
     expect(glmButton).toHaveClass('border-primary');
+  });
+
+  it('supports opening directly into the Ollama preset from the providers landing page', async () => {
+    render(
+      <ProfileCreateDialog open onOpenChange={vi.fn()} onSuccess={vi.fn()} initialMode="ollama" />
+    );
+
+    expect(screen.getByDisplayValue('ollama')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('http://localhost:11434')).toBeInTheDocument();
+    expect(screen.getByText('Local Runtimes')).toBeInTheDocument();
   });
 });

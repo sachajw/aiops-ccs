@@ -10,6 +10,7 @@ import { isReservedName, RESERVED_PROFILE_NAMES } from '../../config/reserved-na
 import {
   createApiProfile,
   createCliproxyBridgeProfile,
+  getLocalRuntimeReadiness,
   removeApiProfile,
   updateApiProfileTarget,
   discoverApiProfileOrphans,
@@ -81,6 +82,14 @@ router.get('/', (_req: Request, res: Response): void => {
 router.get('/cliproxy-bridge/providers', (_req: Request, res: Response): void => {
   try {
     res.json({ providers: listCliproxyBridgeProviders() });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+router.get('/local-runtime-readiness', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json({ runtimes: await getLocalRuntimeReadiness() });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
