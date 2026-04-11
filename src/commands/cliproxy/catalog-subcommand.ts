@@ -198,13 +198,13 @@ export function handleCatalogJson(): void {
   for (const [provider, catalog] of Object.entries(catalogs)) {
     result[provider] = catalog.models.map((m) => {
       const entry: CatalogJsonModel = { id: m.id, name: m.name };
-      if (m.tier) entry.tier = m.tier;
-      if (m.description) entry.description = m.description;
-      if (m.deprecated) entry.deprecated = m.deprecated;
-      if (m.deprecationReason) entry.deprecationReason = m.deprecationReason;
-      if (m.broken) entry.broken = m.broken;
-      if (m.extendedContext) entry.extendedContext = m.extendedContext;
-      if (m.nativeImageInput) entry.nativeImageInput = m.nativeImageInput;
+      if (m.tier !== undefined) entry.tier = m.tier;
+      if (m.description !== undefined) entry.description = m.description;
+      if (m.deprecated !== undefined) entry.deprecated = m.deprecated;
+      if (m.deprecationReason !== undefined) entry.deprecationReason = m.deprecationReason;
+      if (m.broken !== undefined) entry.broken = m.broken;
+      if (m.extendedContext !== undefined) entry.extendedContext = m.extendedContext;
+      if (m.nativeImageInput !== undefined) entry.nativeImageInput = m.nativeImageInput;
       return entry;
     });
   }
