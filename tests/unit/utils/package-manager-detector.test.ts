@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -71,6 +71,39 @@ describe('package-manager-detector', () => {
     expect(install.prefix).toBe(join(tempRoot, '.bun'));
     expect(readInstalledPackageVersion(install)).toBe('7.67.0-dev.9');
   });
+
+  it.if(process.platform !== 'win32')(
+    'detects bun installs from a POSIX symlinked ~/.bun/bin/ccs entrypoint',
+    () => {
+      const tempRoot = makeTempDir('ccs-install-detector-bun-symlink-');
+      const packageRoot = join(
+        tempRoot,
+        '.bun',
+        'install',
+        'global',
+        'node_modules',
+        '@kaitranntt',
+        'ccs'
+      );
+      const scriptPath = join(packageRoot, 'dist', 'ccs.js');
+      const symlinkPath = join(tempRoot, 'home', '.bun', 'bin', 'ccs');
+
+      writePackage(packageRoot, '7.67.0-dev.9');
+      mkdirSync(join(packageRoot, 'dist'), { recursive: true });
+      writeFileSync(scriptPath, '#!/usr/bin/env node\n');
+      mkdirSync(join(tempRoot, 'home', '.bun', 'bin'), { recursive: true });
+      symlinkSync(scriptPath, symlinkPath);
+
+      const install = detectCurrentInstall(symlinkPath);
+      const resolvedTempRoot = realpathSync(tempRoot);
+      const resolvedScriptPath = realpathSync(scriptPath);
+
+      expect(install.manager).toBe('bun');
+      expect(install.prefix).toBe(join(resolvedTempRoot, '.bun'));
+      expect(install.resolvedScriptPath).toBe(resolvedScriptPath);
+      expect(readInstalledPackageVersion(install)).toBe('7.67.0-dev.9');
+    }
+  );
 
   it('detects custom bun install roots that still use install/global/node_modules', () => {
     const tempRoot = makeTempDir('ccs-install-detector-custom-bun-');

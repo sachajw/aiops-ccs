@@ -29,7 +29,9 @@ export interface InstalledPackageState {
 const CCS_PACKAGE_NAME = '@kaitranntt/ccs';
 
 function resolveScriptPath(scriptPath: string): string {
-  if (path.win32.isAbsolute(scriptPath)) {
+  // Keep Windows-style absolute test fixtures stable on non-Windows hosts, but
+  // still resolve real POSIX symlink paths such as ~/.bun/bin/ccs.
+  if (path.win32.isAbsolute(scriptPath) && !path.isAbsolute(scriptPath)) {
     return scriptPath;
   }
 

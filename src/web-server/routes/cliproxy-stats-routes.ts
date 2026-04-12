@@ -6,6 +6,10 @@ import { Router, Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  isRunningUnderSupervisord,
+  restartCliproxyViaSupervisord,
+} from '../../docker/supervisord-lifecycle';
+import {
   fetchCliproxyStats,
   fetchCliproxyModels,
   isCliproxyRunning,
@@ -1014,7 +1018,14 @@ router.post('/install', async (req: Request, res: Response): Promise<void> => {
  */
 router.post('/restart', async (_req: Request, res: Response): Promise<void> => {
   try {
-    // Stop proxy first
+    if (isRunningUnderSupervisord()) {
+      // Docker mode: delegate to supervisord which owns the process lifecycle
+      const result = restartCliproxyViaSupervisord();
+      res.json(result);
+      return;
+    }
+
+    // Local mode: direct process management
     await stopProxy();
 
     // Small delay to ensure port is released

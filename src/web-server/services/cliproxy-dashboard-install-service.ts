@@ -3,6 +3,10 @@ import { ensureCliproxyService, type ServiceStartResult } from '../../cliproxy/s
 import { getProxyStatus as getProxyProcessStatus } from '../../cliproxy/session-tracker';
 import { isCliproxyRunning } from '../../cliproxy/stats-fetcher';
 import type { CLIProxyBackend } from '../../cliproxy/types';
+import {
+  isRunningUnderSupervisord,
+  restartCliproxyViaSupervisord,
+} from '../../docker/supervisord-lifecycle';
 
 interface ProxyStatusLike {
   running: boolean;
@@ -60,6 +64,20 @@ export async function installDashboardCliproxyVersion(
       success: true,
       restarted: false,
       message: `Successfully installed ${backendLabel} v${version}`,
+    };
+  }
+
+  // In Docker, supervisord owns process lifecycle — delegate restart to it
+  if (isRunningUnderSupervisord()) {
+    const result = restartCliproxyViaSupervisord();
+    return {
+      success: result.success,
+      restarted: result.success,
+      port: result.port,
+      error: result.error,
+      message: result.success
+        ? `Successfully installed ${backendLabel} v${version} and restarted it on port ${result.port}`
+        : `Installed ${backendLabel} v${version}, but restart failed`,
     };
   }
 
