@@ -1,3 +1,9 @@
+## [7.68.1](https://github.com/kaitranntt/ccs/compare/v7.68.0...v7.68.1) (2026-04-12)
+
+### Hotfixes
+
+* detect bun-owned installs through symlinked ccs path ([5f8e66e](https://github.com/kaitranntt/ccs/commit/5f8e66ec1e1ef9cceb135c560f9bd44c9269dd6b))
+
 ## [7.68.0](https://github.com/kaitranntt/ccs/compare/v7.67.0...v7.68.0) (2026-04-11)
 
 ### Features
