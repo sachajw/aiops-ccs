@@ -1,12 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { handleUpdateCommand, type UpdateCommandDeps } from '../../../src/commands/update-command';
 import type { UpdateResult } from '../../../src/utils/update-checker';
 
 let logLines: string[] = [];
 let spawnCalls: Array<{ command: string; args: string[]; env?: NodeJS.ProcessEnv }> = [];
 let exitCodes: number[] = [];
-let originalConsoleLog: typeof console.log;
-let originalProcessExit: typeof process.exit;
 
 type InstalledState = {
   version: string | null;
@@ -39,6 +37,12 @@ function createDeps(overrides: Partial<UpdateCommandDeps> = {}): UpdateCommandDe
   return {
     initUI: async () => {},
     getVersion: () => '7.67.0-dev.5',
+    log: (...args: unknown[]) => {
+      logLines.push(args.map(String).join(' '));
+    },
+    exit: ((code?: number) => {
+      exitCodes.push(code ?? 0);
+    }) as typeof process.exit,
     detectCurrentInstall: () => currentInstallOverride,
     buildPackageManagerEnv: () => {
       if (currentInstallOverride.manager === 'npm') {
@@ -110,22 +114,6 @@ beforeEach(() => {
     latest: '7.67.0-dev.9',
   };
   currentInstallOverride = installDescriptor();
-
-  originalConsoleLog = console.log;
-  originalProcessExit = process.exit;
-
-  console.log = (...args: unknown[]) => {
-    logLines.push(args.map(String).join(' '));
-  };
-
-  process.exit = ((code?: number) => {
-    exitCodes.push(code ?? 0);
-  }) as typeof process.exit;
-});
-
-afterEach(() => {
-  console.log = originalConsoleLog;
-  process.exit = originalProcessExit;
 });
 
 describe('update-command current install handling', () => {

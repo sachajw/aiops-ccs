@@ -31,6 +31,8 @@ type TargetTag = 'latest' | 'dev';
 export interface UpdateCommandDeps {
   initUI: typeof initUI;
   getVersion: typeof getVersion;
+  log: typeof console.log;
+  exit: typeof process.exit;
   detectCurrentInstall: typeof detectCurrentInstall;
   buildPackageManagerEnv: typeof buildPackageManagerEnv;
   formatManualUpdateCommand: typeof formatManualUpdateCommand;
@@ -58,6 +60,8 @@ async function loadCheckForUpdates(
 const defaultDeps: UpdateCommandDeps = {
   initUI,
   getVersion,
+  log: console.log,
+  exit: process.exit.bind(process) as typeof process.exit,
   detectCurrentInstall,
   buildPackageManagerEnv,
   formatManualUpdateCommand,
@@ -96,14 +100,14 @@ export async function handleUpdateCommand(
   const currentInstall = deps.detectCurrentInstall();
   const currentVersion = deps.getVersion();
 
-  console.log('');
-  console.log(header('Checking for updates...'));
-  console.log('');
+  deps.log('');
+  deps.log(header('Checking for updates...'));
+  deps.log('');
 
   // Force reinstall - skip update check
   if (force) {
-    console.log(info(`Force reinstall from @${targetTag} channel...`));
-    console.log('');
+    deps.log(info(`Force reinstall from @${targetTag} channel...`));
+    deps.log('');
     const expectedVersion = await resolveTargetVersion(currentVersion, targetTag, deps);
     await performNpmUpdate(currentInstall, targetTag, true, expectedVersion, deps);
     return;
@@ -122,13 +126,13 @@ export async function handleUpdateCommand(
   }
 
   if (updateResult.status === 'no_update') {
-    handleNoUpdate(updateResult.reason, currentVersion);
+    handleNoUpdate(updateResult.reason, currentVersion, deps);
     return;
   }
 
   // Update available
-  console.log(warn(`Update available: ${updateResult.current} -> ${updateResult.latest}`));
-  console.log('');
+  deps.log(warn(`Update available: ${updateResult.current} -> ${updateResult.latest}`));
+  deps.log('');
 
   // Check if this is a downgrade (e.g., stable to older dev)
   const isDowngrade =
@@ -138,7 +142,7 @@ export async function handleUpdateCommand(
 
   // This happens when stable user requests @dev but @dev base is older
   if (isDowngrade && beta) {
-    console.log(
+    deps.log(
       warn(
         'WARNING: Downgrading from ' +
           (updateResult.current || 'unknown') +
@@ -146,16 +150,16 @@ export async function handleUpdateCommand(
           (updateResult.latest || 'unknown')
       )
     );
-    console.log(warn('Dev channel may be behind stable.'));
-    console.log('');
+    deps.log(warn('Dev channel may be behind stable.'));
+    deps.log('');
   }
 
   // Show beta warning
   if (beta) {
-    console.log(warn('Installing from @dev channel (unstable)'));
-    console.log(warn('Not recommended for production use'));
-    console.log(info('Use `ccs update` (without --beta) to return to stable'));
-    console.log('');
+    deps.log(warn('Installing from @dev channel (unstable)'));
+    deps.log(warn('Not recommended for production use'));
+    deps.log(info('Use `ccs update` (without --beta) to return to stable'));
+    deps.log('');
   }
 
   await performNpmUpdate(currentInstall, targetTag, false, updateResult.latest, deps);
@@ -170,40 +174,44 @@ function handleCheckFailed(
   currentInstall: CurrentInstall = defaultDeps.detectCurrentInstall(),
   deps: UpdateCommandDeps = defaultDeps
 ): void {
-  console.log(fail(message));
-  console.log('');
-  console.log(warn('Possible causes:'));
-  console.log('  - Network connection issues');
-  console.log('  - Firewall blocking requests');
-  console.log('  - GitHub/npm API temporarily unavailable');
-  console.log('');
-  console.log('Try again later or update manually:');
+  deps.log(fail(message));
+  deps.log('');
+  deps.log(warn('Possible causes:'));
+  deps.log('  - Network connection issues');
+  deps.log('  - Firewall blocking requests');
+  deps.log('  - GitHub/npm API temporarily unavailable');
+  deps.log('');
+  deps.log('Try again later or update manually:');
 
-  console.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
-  console.log('');
-  process.exit(1);
+  deps.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
+  deps.log('');
+  deps.exit(1);
 }
 
 /**
  * Handle no update available
  */
-function handleNoUpdate(reason: string | undefined, version: string): void {
+function handleNoUpdate(
+  reason: string | undefined,
+  version: string,
+  deps: UpdateCommandDeps
+): void {
   let message = `You are already on the latest version (${version})`;
 
   switch (reason) {
     case 'dismissed':
       message = `Update dismissed. You are on version ${version}`;
-      console.log(warn(message));
+      deps.log(warn(message));
       break;
     case 'cached':
       message = `No updates available (cached result). You are on version ${version}`;
-      console.log(info(message));
+      deps.log(info(message));
       break;
     default:
-      console.log(ok(message));
+      deps.log(ok(message));
   }
-  console.log('');
-  process.exit(0);
+  deps.log('');
+  deps.exit(0);
 }
 
 /**
@@ -220,15 +228,13 @@ async function verifyCurrentInstallVersion(
   const nextState = deps.readInstalledPackageState(currentInstall);
   const installedVersion = nextState.version;
   if (!installedVersion) {
-    console.log('');
-    console.log(
-      fail('Update finished, but CCS could not verify the current installation version.')
-    );
-    console.log('');
-    console.log('Current install remains ambiguous. Re-run manually:');
-    console.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
-    console.log('');
-    process.exit(1);
+    deps.log('');
+    deps.log(fail('Update finished, but CCS could not verify the current installation version.'));
+    deps.log('');
+    deps.log('Current install remains ambiguous. Re-run manually:');
+    deps.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
+    deps.log('');
+    deps.exit(1);
     return;
   }
 
@@ -259,26 +265,24 @@ async function verifyCurrentInstallVersion(
 
     const comparison = deps.compareVersionsWithPrerelease(installedVersion, expectedVersion);
     if (comparison < 0 || installedVersion === previousState?.version) {
-      console.log('');
-      console.log(
+      deps.log('');
+      deps.log(
         fail(
           `Update completed outside the current installation. Current binary still reports ${installedVersion}; expected ${expectedVersion}.`
         )
       );
       if (previousState?.version && previousState.version === installedVersion) {
-        console.log(
+        deps.log(
           warn(
             `The current install path did not change from ${previousState.version}; another package manager likely updated a different copy of CCS.`
           )
         );
       }
-      console.log('');
-      console.log('Re-run manually against the current install:');
-      console.log(
-        color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command')
-      );
-      console.log('');
-      process.exit(1);
+      deps.log('');
+      deps.log('Re-run manually against the current install:');
+      deps.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
+      deps.log('');
+      deps.exit(1);
       return;
     }
   }
@@ -289,8 +293,8 @@ async function verifyCurrentInstallVersion(
     installedVersion === previousState.version &&
     !installChanged
   ) {
-    console.log('');
-    console.log(
+    deps.log('');
+    deps.log(
       warn(
         `Reinstall completed, but CCS could not prove that the current installation changed from ${previousState.version}. Verify the current binary manually if this reinstall was meant to repair a same-version install.`
       )
@@ -391,8 +395,8 @@ async function performNpmUpdate(
       cacheArgs = ['cache', 'clean', '--force'];
   }
 
-  console.log(info(`${isReinstall ? 'Reinstalling' : 'Updating'} via ${packageManager}...`));
-  console.log('');
+  deps.log(info(`${isReinstall ? 'Reinstalling' : 'Updating'} via ${packageManager}...`));
+  deps.log('');
 
   const isWindows = process.platform === 'win32';
 
@@ -406,17 +410,17 @@ async function performNpmUpdate(
       ? 'Pre-removal failed, proceeding anyway...'
       : 'Cache clearing failed, proceeding anyway...';
 
-    console.log(info(stepMessage));
+    deps.log(info(stepMessage));
     try {
       const cacheCode = await runChildProcess(deps, cacheCommand, cacheArgs, {
         isWindows,
         env: childEnv,
       });
       if (cacheCode !== 0) {
-        console.log(warn(failMessage));
+        deps.log(warn(failMessage));
       }
     } catch {
-      console.log(warn(failMessage));
+      deps.log(warn(failMessage));
     }
   }
 
@@ -438,31 +442,29 @@ async function performNpmUpdate(
           deps
         );
       }
-      console.log('');
-      console.log(ok(`${isReinstall ? 'Reinstall' : 'Update'} successful!`));
-      console.log('');
-      console.log(`Run ${color('ccs --version', 'command')} to verify`);
-      console.log(info(`Tip: Use ${color('ccs config', 'command')} for web-based configuration`));
-      console.log('');
+      deps.log('');
+      deps.log(ok(`${isReinstall ? 'Reinstall' : 'Update'} successful!`));
+      deps.log('');
+      deps.log(`Run ${color('ccs --version', 'command')} to verify`);
+      deps.log(info(`Tip: Use ${color('ccs config', 'command')} for web-based configuration`));
+      deps.log('');
     } else {
-      console.log('');
-      console.log(fail(`${isReinstall ? 'Reinstall' : 'Update'} failed`));
-      console.log('');
-      console.log('Try manually:');
-      console.log(
-        color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command')
-      );
-      console.log('');
+      deps.log('');
+      deps.log(fail(`${isReinstall ? 'Reinstall' : 'Update'} failed`));
+      deps.log('');
+      deps.log('Try manually:');
+      deps.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
+      deps.log('');
     }
 
-    process.exit(exitCode || 0);
+    deps.exit(exitCode || 0);
   } catch {
-    console.log('');
-    console.log(fail(`Failed to run ${packageManager} ${isReinstall ? 'reinstall' : 'update'}`));
-    console.log('');
-    console.log('Try manually:');
-    console.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
-    console.log('');
-    process.exit(1);
+    deps.log('');
+    deps.log(fail(`Failed to run ${packageManager} ${isReinstall ? 'reinstall' : 'update'}`));
+    deps.log('');
+    deps.log('Try manually:');
+    deps.log(color(`  ${deps.formatManualUpdateCommand(targetTag, currentInstall)}`, 'command'));
+    deps.log('');
+    deps.exit(1);
   }
 }
