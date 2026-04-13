@@ -871,12 +871,10 @@ describe('Image Analyzer Hook', () => {
     });
 
     it('should output valid JSON structure on file read error', async () => {
-      // Create and immediately delete file to trigger error
+      // Use a directory with an analyzable extension so readFileSync fails
+      // consistently across POSIX and Windows.
       const errorPath = path.join(TEST_DIR, 'error-test.png');
-      createTestPng(errorPath);
-
-      // Make file unreadable (simulate permission error)
-      fs.chmodSync(errorPath, 0o000);
+      fs.mkdirSync(errorPath);
 
       const result = await invokeHookAsync(
         {
@@ -886,9 +884,7 @@ describe('Image Analyzer Hook', () => {
         { CCS_IMAGE_ANALYSIS_ENABLED: '1', CCS_PROFILE_TYPE: 'cliproxy' }
       );
 
-      // Restore permissions and cleanup
-      fs.chmodSync(errorPath, 0o644);
-      fs.unlinkSync(errorPath);
+      fs.rmSync(errorPath, { recursive: true, force: true });
 
       // Should output error in JSON format
       expect(result.code).toBe(2);

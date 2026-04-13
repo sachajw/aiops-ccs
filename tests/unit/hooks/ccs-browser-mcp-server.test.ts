@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { spawn } from 'child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { tmpdir } from 'node:os';
@@ -50,7 +50,12 @@ type MockPageState = {
   >;
 };
 
-const serverPath = join(process.cwd(), 'lib', 'mcp', 'ccs-browser-server.cjs');
+const bundledServerPath = join(process.cwd(), 'lib', 'mcp', 'ccs-browser-server.cjs');
+
+type RunMcpRequestsOptions = {
+  serverPath?: string;
+  childEnv?: NodeJS.ProcessEnv;
+};
 
 function encodeMessage(message: unknown): string {
   return `${JSON.stringify(message)}\n`;
@@ -162,7 +167,9 @@ function createMockBrowser(pagesInput: MockPageState[]) {
     });
   }
 
-  async function start() {
+  async function start(options: RunMcpRequestsOptions = {}) {
+    const entryServerPath = options.serverPath || bundledServerPath;
+    const childEnv = options.childEnv || {};
     tempDir = mkdtempSync(join(tmpdir(), 'ccs-browser-mcp-server-'));
 
     const port = await new Promise<number>((resolve, reject) => {
@@ -404,10 +411,11 @@ function createMockBrowser(pagesInput: MockPageState[]) {
       });
     });
 
-    const child = spawn('node', [serverPath], {
+    const child = spawn('node', [entryServerPath], {
       cwd: tempDir,
       env: {
         ...process.env,
+        ...childEnv,
         CCS_BROWSER_DEVTOOLS_HTTP_URL: `http://127.0.0.1:${port}`,
       },
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -438,9 +446,13 @@ function createMockBrowser(pagesInput: MockPageState[]) {
   return { start, stop };
 }
 
-async function runMcpRequests(pages: MockPageState[], requests: JsonRpcMessage[]) {
+async function runMcpRequests(
+  pages: MockPageState[],
+  requests: JsonRpcMessage[],
+  options: RunMcpRequestsOptions = {}
+) {
   const browser = createMockBrowser(pages);
-  const child = await browser.start();
+  const child = await browser.start(options);
 
   try {
     const responsesPromise = collectResponses(child, requests.length + 1);
@@ -507,6 +519,46 @@ describe('ccs-browser MCP server', () => {
         type: 'integer',
         minimum: 0,
       });
+    }
+  });
+
+  it('works from an installed copy when global WebSocket is unavailable and NODE_PATH supplies package dependencies', async () => {
+    const installDir = mkdtempSync(join(tmpdir(), 'ccs-browser-installed-copy-'));
+    const installedServerPath = join(installDir, 'ccs-browser-server.cjs');
+    const bootstrapServerPath = join(installDir, 'bootstrap.cjs');
+
+    try {
+      cpSync(bundledServerPath, installedServerPath);
+      writeFileSync(
+        bootstrapServerPath,
+        'delete globalThis.WebSocket;\nrequire("./ccs-browser-server.cjs");\n',
+        'utf8'
+      );
+
+      const responses = await runMcpRequests(
+        [{ id: 'page-1', title: 'Installed Copy', currentUrl: 'https://example.com/' }],
+        [
+          {
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'tools/call',
+            params: { name: 'browser_get_url_and_title', arguments: {} },
+          },
+        ],
+        {
+          serverPath: bootstrapServerPath,
+          childEnv: {
+            NODE_PATH: join(process.cwd(), 'node_modules'),
+          },
+        }
+      );
+
+      const response = responses.find((message) => message.id === 2);
+      expect((response?.result as { isError?: boolean }).isError).not.toBe(true);
+      expect(getResponseText(response)).toContain('title: Installed Copy');
+      expect(getResponseText(response)).toContain('url: https://example.com/');
+    } finally {
+      rmSync(installDir, { recursive: true, force: true });
     }
   });
 
