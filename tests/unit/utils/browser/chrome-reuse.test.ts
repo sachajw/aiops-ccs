@@ -3,12 +3,15 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import {
+  resolveConfiguredBrowserProfileDir,
   resolveBrowserRuntimeEnv,
   resolveDefaultChromeUserDataDir,
 } from '../../../../src/utils/browser/chrome-reuse';
 
 describe('chrome reuse resolver', () => {
+  const originalHome = process.env.HOME;
   const originalLocalAppData = process.env.LOCALAPPDATA;
+  const originalUserProfile = process.env.USERPROFILE;
   let tempDirs: string[] = [];
   let servers: Array<{ stop: () => void }> = [];
 
@@ -96,6 +99,18 @@ describe('chrome reuse resolver', () => {
     } else {
       process.env.LOCALAPPDATA = originalLocalAppData;
     }
+
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+
+    if (originalUserProfile === undefined) {
+      delete process.env.USERPROFILE;
+    } else {
+      process.env.USERPROFILE = originalUserProfile;
+    }
   });
 
   it('uses explicit profile-dir before the default path and resolves the websocket target', async () => {
@@ -120,6 +135,23 @@ describe('chrome reuse resolver', () => {
       CCS_BROWSER_DEVTOOLS_WS_URL: 'ws://127.0.0.1/devtools/browser/target-1',
     });
     expect(fs.existsSync(path.join(defaultProfileDir, 'DevToolsActivePort'))).toBe(false);
+  });
+
+  it('only enables browser reuse for an explicitly configured profile directory', () => {
+    const isolatedHome = createTempDir('ccs-chrome-config-home-');
+    const defaultProfileDir = path.join(
+      isolatedHome,
+      'Library',
+      'Application Support',
+      'Google',
+      'Chrome'
+    );
+    writeDevToolsActivePort(defaultProfileDir, '9222\n/devtools/browser/stale-default');
+    process.env.HOME = isolatedHome;
+    process.env.USERPROFILE = isolatedHome;
+
+    expect(resolveConfiguredBrowserProfileDir()).toBeUndefined();
+    expect(resolveConfiguredBrowserProfileDir(defaultProfileDir)).toBe(defaultProfileDir);
   });
 
   it('uses an explicit devtools port override when metadata is missing', async () => {

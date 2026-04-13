@@ -49,18 +49,7 @@ export function resolveDefaultChromeUserDataDir(
 }
 
 export function resolveConfiguredBrowserProfileDir(profileDir?: string): string | undefined {
-  if (profileDir?.trim()) {
-    return expandPath(profileDir);
-  }
-
-  try {
-    const defaultUserDataDir = resolveDefaultChromeUserDataDir();
-    return fs.existsSync(path.join(defaultUserDataDir, DEVTOOLS_ACTIVE_PORT_FILE))
-      ? defaultUserDataDir
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  return profileDir?.trim() ? expandPath(profileDir) : undefined;
 }
 
 export async function resolveBrowserRuntimeEnv(

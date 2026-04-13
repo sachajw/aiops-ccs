@@ -151,6 +151,40 @@ exit 0
     await expect(waitForMockDevtoolsPort(delayedPortFile, 500)).resolves.toBe('43123');
   });
 
+  it('ignores stale default Chrome DevTools metadata unless browser reuse is explicitly configured', () => {
+    if (process.platform === 'win32') return;
+
+    const defaultChromeDir = path.join(
+      tmpHome,
+      'Library',
+      'Application Support',
+      'Google',
+      'Chrome'
+    );
+    fs.mkdirSync(defaultChromeDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(defaultChromeDir, 'DevToolsActivePort'),
+      '9222\n/devtools/browser/stale-default',
+      'utf8'
+    );
+
+    const result = runCcs(['default', 'smoke'], {
+      ...baseEnv,
+      HOME: tmpHome,
+      USERPROFILE: tmpHome,
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('Chrome DevTools endpoint is unreachable');
+
+    const launchedArgs = fs.readFileSync(claudeArgsLogPath, 'utf8');
+    expect(launchedArgs).not.toContain(BROWSER_PROMPT_SNIPPET);
+
+    const launchedEnv = fs.readFileSync(claudeEnvLogPath, 'utf8');
+    expect(launchedEnv).not.toContain('9222');
+    expect(launchedEnv).not.toContain('devtools/browser/stale-default');
+  });
+
   it('passes browser runtime env through default Claude launches when reuse is configured', async () => {
     if (process.platform === 'win32') return;
 
