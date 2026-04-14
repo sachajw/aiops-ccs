@@ -50,6 +50,25 @@ ccs glm
 ccs ollama
 ```
 
+## OpenAI-Compatible Routing
+
+CCS can now bridge Claude Code into OpenAI-compatible providers through a local
+Anthropic-compatible proxy instead of requiring a native Anthropic upstream.
+
+```bash
+ccs api create --preset hf
+ccs hf
+```
+
+Need to manage the proxy manually?
+
+```bash
+ccs proxy start hf
+eval "$(ccs proxy activate)"
+```
+
+Guide: [OpenAI-Compatible Provider Routing](./docs/openai-compatible-providers.md)
+
 Need the full setup path instead of the short version?
 
 | Need | Start here |
