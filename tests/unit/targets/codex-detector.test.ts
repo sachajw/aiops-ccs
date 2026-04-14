@@ -73,7 +73,7 @@ describe('codex-detector', () => {
     execFileSyncSpy.mockRestore();
   });
 
-  it('prefers a sibling PowerShell wrapper over cmd when Windows PATH only exposes codex.cmd', () => {
+  it('keeps the cmd wrapper when Windows PATH exposes codex.cmd and a sibling ps1 also exists', () => {
     const fakeCmdCodex = path.join(tmpDir, 'codex.cmd');
     const fakePsCodex = path.join(tmpDir, 'codex.ps1');
     fs.writeFileSync(fakeCmdCodex, '');
@@ -82,7 +82,21 @@ describe('codex-detector', () => {
 
     const execSyncSpy = spyOn(childProcess, 'execSync').mockImplementation(() => `${fakeCmdCodex}\n`);
 
-    expect(detectCodexCli()).toBe(fakePsCodex);
+    expect(detectCodexCli()).toBe(fakeCmdCodex);
+
+    execSyncSpy.mockRestore();
+  });
+
+  it('replaces a Windows PowerShell wrapper with a sibling cmd shim when PATH returns codex.ps1', () => {
+    const fakeCmdCodex = path.join(tmpDir, 'codex.cmd');
+    const fakePsCodex = path.join(tmpDir, 'codex.ps1');
+    fs.writeFileSync(fakeCmdCodex, '');
+    fs.writeFileSync(fakePsCodex, '');
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+
+    const execSyncSpy = spyOn(childProcess, 'execSync').mockImplementation(() => `${fakePsCodex}\n`);
+
+    expect(detectCodexCli()).toBe(fakeCmdCodex);
 
     execSyncSpy.mockRestore();
   });
