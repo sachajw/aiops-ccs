@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import i18n from '@/lib/i18n';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -228,7 +229,7 @@ function TargetStatusCard({
 
         <div className="rounded-lg border bg-muted/25 p-3 text-sm text-muted-foreground">
           {status?.message ||
-            t('claudeExtensionPage.verifyAfterSaving', {
+            i18n.t('claudeExtensionPage.verifyAfterSaving', {
               defaultValue: 'Verify the binding after saving to inspect the current file state.',
             })}
         </div>
