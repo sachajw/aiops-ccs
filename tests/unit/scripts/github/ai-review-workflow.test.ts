@@ -44,6 +44,15 @@ describe('PR-Agent review lane migration', () => {
     expect(config).toContain('git_provider = "github"');
     expect(config).toContain('fallback_models = ["gpt-5.4-mini"]');
     expect(config).toContain('custom_model_max_tokens = 131072');
+    expect(config).toContain('require_score_review = true');
+    expect(config).toContain('require_estimate_effort_to_review = true');
+    expect(config).toContain('require_can_be_split_review = true');
+    expect(config).toContain('require_todo_scan = true');
+    expect(config).toContain('require_ticket_analysis_review = true');
+    expect(config).toContain('num_max_findings = 10');
+    expect(config).toContain('final_update_message = true');
+    expect(config).toContain('enable_intro_text = true');
+    expect(config).toContain('enable_help_text = true');
     expect(config).toContain('[pr_reviewer]');
     expect(config).not.toContain('auto_review = true');
     expect(config).not.toContain('claude-code-action');
