@@ -182,6 +182,20 @@ describe('Claude Quota Fetcher', () => {
       expect(windows[1].rateLimitType).toBe('seven_day_sonnet');
       expect(windows[1].remainingPercent).toBe(91);
     });
+
+    it('parses future OAuth usage windows without hardcoded keys', () => {
+      const windows = buildClaudeQuotaWindows({
+        seven_day_haiku: {
+          utilization: 16,
+          resets_at: '2026-03-06T10:00:00Z',
+        },
+      });
+
+      expect(windows).toHaveLength(1);
+      expect(windows[0].rateLimitType).toBe('seven_day_haiku');
+      expect(windows[0].label).toBe('Seven Day Haiku');
+      expect(windows[0].remainingPercent).toBe(84);
+    });
   });
 
   describe('buildClaudeCoreUsageSummary', () => {

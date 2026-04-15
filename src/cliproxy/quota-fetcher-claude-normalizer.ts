@@ -74,7 +74,14 @@ function getClaudeWindowLabel(rateLimitType: string): string {
     case 'overage':
       return 'Extra usage';
     default:
-      return rateLimitType || 'Unknown limit';
+      if (!rateLimitType) return 'Unknown limit';
+      return rateLimitType
+        .split(/[_-]+/g)
+        .filter((part) => part.length > 0)
+        .map((part) =>
+          /^\d+$/.test(part) ? part : `${part.charAt(0).toUpperCase()}${part.slice(1)}`
+        )
+        .join(' ');
   }
 }
 
@@ -188,15 +195,13 @@ function normalizeRestriction(
  * Supports both policy-limits `restrictions` payloads and OAuth usage payloads
  * keyed by window name (`five_hour`, `seven_day`, `seven_day_sonnet`, ...).
  */
-const CLAUDE_USAGE_WINDOW_KEYS = new Set([
-  'five_hour',
-  'seven_day',
-  'seven_day_opus',
-  'seven_day_sonnet',
-  'seven_day_oauth_apps',
-  'seven_day_cowork',
-  'iguana_necktie',
-]);
+function isClaudeOAuthUsageWindowCandidate(key: string, raw: Record<string, unknown>): boolean {
+  if (key === 'extra_usage') return false;
+  if (asNumber(raw['utilization']) === null) return false;
+
+  const resetAt = raw['resetsAt'] ?? raw['resets_at'] ?? raw['resetAt'] ?? raw['reset_at'] ?? null;
+  return resetAt !== null && resetAt !== undefined;
+}
 
 export function buildClaudeQuotaWindows(payload: Record<string, unknown>): ClaudeQuotaWindow[] {
   const rawRestrictions = payload['restrictions'];
@@ -218,9 +223,9 @@ export function buildClaudeQuotaWindows(payload: Record<string, unknown>): Claud
     }
   } else if (toObject(payload)) {
     for (const [key, value] of Object.entries(payload)) {
-      if (!CLAUDE_USAGE_WINDOW_KEYS.has(key)) continue;
       const raw = toObject(value);
       if (!raw) continue;
+      if (!isClaudeOAuthUsageWindowCandidate(key, raw)) continue;
       const window = normalizeRestriction(raw, key);
       if (window) windows.push(window);
     }
