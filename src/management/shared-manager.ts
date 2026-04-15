@@ -936,6 +936,10 @@ class SharedManager {
         }
 
         for (const [name, value] of Object.entries(parsed as Record<string, unknown>)) {
+          if (!this.isMarketplaceRegistryEntry(value)) {
+            continue;
+          }
+
           merged[name] = normalizePluginMetadataValue(value, targetConfigDir).normalized;
         }
       } catch (err) {
@@ -947,21 +951,19 @@ class SharedManager {
 
     const discoveredEntries = this.discoverMarketplaceEntries(targetConfigDir);
 
-    for (const [name, value] of Object.entries(discoveredEntries)) {
-      const existing = merged[name];
-      if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
-        merged[name] = {
-          ...(existing as Record<string, unknown>),
-          installLocation: value.installLocation,
-        };
-        continue;
-      }
-
-      merged[name] = value;
-    }
-
+    // Keep only registry entries that have a physical directory, and update their
+    // installLocation. Entries only on disk (no registry record) are excluded —
+    // they lack required schema fields that Claude Code enforces.
     for (const name of Object.keys(merged)) {
+      const entry = merged[name];
       if (!(name in discoveredEntries)) {
+        delete merged[name];
+      } else if (this.isMarketplaceRegistryEntry(entry)) {
+        merged[name] = {
+          ...entry,
+          installLocation: discoveredEntries[name].installLocation,
+        };
+      } else {
         delete merged[name];
       }
     }
@@ -984,12 +986,25 @@ class SharedManager {
         continue;
       }
 
+      // Skip hidden dirs and Claude Code rename-dance leftovers (.staging/.bak).
+      if (this.isTransientMarketplaceDirectory(entry.name)) {
+        continue;
+      }
+
       discovered[entry.name] = {
         installLocation: path.join(targetConfigDir, 'plugins', 'marketplaces', entry.name),
       };
     }
 
     return discovered;
+  }
+
+  private isTransientMarketplaceDirectory(name: string): boolean {
+    return name.startsWith('.') || name.endsWith('.staging') || name.endsWith('.bak');
+  }
+
+  private isMarketplaceRegistryEntry(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
   }
 
   private writePluginMetadataFile(
