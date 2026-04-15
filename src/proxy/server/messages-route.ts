@@ -1,12 +1,15 @@
 import * as http from 'http';
 import type { Dispatcher } from 'undici';
 import type { OpenAICompatProfileConfig } from '../profile-router';
+import { resolveProxyRequestRoute } from '../request-router';
 import { ProxyRequestTransformer } from '../transformers/request-transformer';
 import { ProxySseStreamTransformer } from '../transformers/sse-stream-transformer';
 import { resolveOpenAIChatCompletionsUrl } from '../upstream-url';
+import { createLogger } from '../../services/logging';
 import { pipeWebResponseToNode, readJsonBody, writeJson } from './http-helpers';
 
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 600_000;
+const logger = createLogger('proxy:openai-compat:messages');
 
 class ProxyInputError extends Error {
   constructor(message: string) {
@@ -23,7 +26,10 @@ function buildUpstreamHeaders(profile: OpenAICompatProfileConfig): Record<string
   };
 }
 
-function buildUpstreamBody(profile: OpenAICompatProfileConfig, rawBody: unknown): string {
+function buildUpstreamRequest(
+  profile: OpenAICompatProfileConfig,
+  rawBody: unknown
+): { body: string; route: ReturnType<typeof resolveProxyRequestRoute> } {
   let transformed;
   try {
     const transformer = new ProxyRequestTransformer();
@@ -32,12 +38,13 @@ function buildUpstreamBody(profile: OpenAICompatProfileConfig, rawBody: unknown)
     const message = error instanceof Error ? error.message : 'Invalid Anthropic request';
     throw new ProxyInputError(message);
   }
+  const route = resolveProxyRequestRoute(profile, transformed);
   const body = {
     ...transformed,
-    model: transformed.model || profile.model,
+    model: route.model || route.profile.model,
     stream: transformed.stream === true,
   };
-  return JSON.stringify(body);
+  return { body: JSON.stringify(body), route };
 }
 
 export function extractIncomingProxyToken(headers: http.IncomingHttpHeaders): string | null {
@@ -88,6 +95,20 @@ function buildFetchInit(
   return init;
 }
 
+function getRequestTimeoutMs(): number {
+  const rawValue = process.env.CCS_OPENAI_PROXY_REQUEST_TIMEOUT_MS;
+  if (!rawValue) {
+    return REQUEST_TIMEOUT_MS;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : REQUEST_TIMEOUT_MS;
+}
+
+function formatTimeoutDuration(timeoutMs: number): string {
+  return timeoutMs % 1000 === 0 ? `${timeoutMs / 1000} seconds` : `${timeoutMs}ms`;
+}
+
 export async function handleProxyMessagesRequest(
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -98,6 +119,9 @@ export async function handleProxyMessagesRequest(
   const transformer = new ProxySseStreamTransformer();
 
   if (!validateIncomingProxyAuth(req.headers, expectedAuthToken)) {
+    logger.warn('auth.invalid', 'Rejected proxy message request with invalid auth token', {
+      remoteAddress: req.socket.remoteAddress || null,
+    });
     await pipeWebResponseToNode(
       transformer.error(401, 'authentication_error', 'Missing or invalid local proxy token'),
       res
@@ -105,34 +129,77 @@ export async function handleProxyMessagesRequest(
     return;
   }
 
+  let timeoutMs = REQUEST_TIMEOUT_MS;
   try {
     const rawBody = await readJsonBody(req);
-    const upstreamBody = buildUpstreamBody(profile, rawBody);
+    const upstream = buildUpstreamRequest(profile, rawBody);
+    logger.info('request.forward', 'Forwarding Anthropic request to OpenAI-compatible upstream', {
+      profileName: upstream.route.profile.profileName,
+      provider: upstream.route.profile.provider,
+      baseUrl: upstream.route.profile.baseUrl,
+      model: upstream.route.model || upstream.route.profile.model || null,
+      routeSource: upstream.route.source,
+      scenario: upstream.route.scenario || null,
+      estimatedTokens: upstream.route.estimatedTokens,
+    });
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    const abortOnDisconnect = () => {
+    timeoutMs = getRequestTimeoutMs();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const abortOnDisconnect = (source: string) => {
       if (!controller.signal.aborted && !res.writableEnded) {
+        logger.info(
+          'request.disconnect',
+          'Aborting upstream request after local client disconnect',
+          {
+            profileName: profile.profileName,
+            source,
+          }
+        );
         controller.abort();
       }
     };
 
-    req.on('aborted', abortOnDisconnect);
-    req.on('close', abortOnDisconnect);
-    res.on('close', abortOnDisconnect);
+    req.on('aborted', () => abortOnDisconnect('req.aborted'));
+    req.on('close', () => abortOnDisconnect('req.close'));
+    req.socket?.on('close', () => abortOnDisconnect('req.socket.close'));
+    res.on('close', () => abortOnDisconnect('res.close'));
+    res.socket?.on('close', () => abortOnDisconnect('res.socket.close'));
+    const disconnectPoll = setInterval(() => {
+      if (
+        req.destroyed ||
+        res.destroyed ||
+        req.socket?.destroyed === true ||
+        res.socket?.destroyed === true
+      ) {
+        abortOnDisconnect('poll.destroyed');
+      }
+    }, 50);
 
     try {
       const upstreamResponse = await fetch(
-        resolveOpenAIChatCompletionsUrl(profile.baseUrl),
-        buildFetchInit(profile, upstreamBody, controller.signal, insecureDispatcher)
+        resolveOpenAIChatCompletionsUrl(upstream.route.profile.baseUrl),
+        buildFetchInit(upstream.route.profile, upstream.body, controller.signal, insecureDispatcher)
       );
       clearTimeout(timeout);
+      clearInterval(disconnectPoll);
+      logger.info('response.received', 'Received upstream response', {
+        profileName: profile.profileName,
+        routedProfileName: upstream.route.profile.profileName,
+        status: upstreamResponse.status,
+      });
       const response = await transformer.transform(upstreamResponse);
       await pipeWebResponseToNode(response, res);
     } finally {
       clearTimeout(timeout);
+      clearInterval(disconnectPoll);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown proxy error';
+    logger.error('request.failed', 'Proxy message request failed', {
+      profileName: profile.profileName,
+      error: message,
+      abort: error instanceof Error && error.name === 'AbortError',
+    });
     const status =
       error instanceof Error && error.name === 'AbortError'
         ? 502
@@ -149,7 +216,7 @@ export async function handleProxyMessagesRequest(
         status,
         type,
         error instanceof Error && error.name === 'AbortError'
-          ? 'The upstream provider did not respond within 30 seconds'
+          ? `The upstream provider did not respond within ${formatTimeoutDuration(timeoutMs)}`
           : message
       ),
       res

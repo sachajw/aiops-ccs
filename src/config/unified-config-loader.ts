@@ -384,6 +384,18 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
             : defaults.cliproxy.routing?.strategy,
       },
     },
+    proxy: {
+      routing: {
+        default: partial.proxy?.routing?.default ?? defaults.proxy?.routing?.default,
+        background: partial.proxy?.routing?.background ?? defaults.proxy?.routing?.background,
+        think: partial.proxy?.routing?.think ?? defaults.proxy?.routing?.think,
+        longContext: partial.proxy?.routing?.longContext ?? defaults.proxy?.routing?.longContext,
+        webSearch: partial.proxy?.routing?.webSearch ?? defaults.proxy?.routing?.webSearch,
+        longContextThreshold:
+          partial.proxy?.routing?.longContextThreshold ??
+          defaults.proxy?.routing?.longContextThreshold,
+      },
+    },
     logging: {
       enabled: partial.logging?.enabled ?? DEFAULT_LOGGING_CONFIG.enabled,
       level: partial.logging?.level ?? DEFAULT_LOGGING_CONFIG.level,
@@ -673,6 +685,17 @@ function generateYamlWithComments(config: UnifiedConfig): string {
     yaml.dump({ cliproxy: config.cliproxy }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
   );
   lines.push('');
+
+  if (config.proxy?.routing) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Proxy Routing: OpenAI-compatible local proxy model selection rules');
+    lines.push('# Use profile:model selectors to force a target profile and upstream model.');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml.dump({ proxy: config.proxy }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
+    );
+    lines.push('');
+  }
 
   if (config.logging) {
     lines.push('# ----------------------------------------------------------------------------');

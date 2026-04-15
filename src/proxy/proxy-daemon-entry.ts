@@ -4,6 +4,7 @@ import { startOpenAICompatProxyServer } from './server/proxy-server';
 
 interface RuntimeOptions {
   port: number;
+  host: string;
   profileName: string;
   settingsPath: string;
   authToken: string;
@@ -12,6 +13,7 @@ interface RuntimeOptions {
 
 function parseArgs(argv: string[]): RuntimeOptions {
   let port = 3456;
+  let host = '127.0.0.1';
   let profileName = '';
   let settingsPath = '';
   let authToken = '';
@@ -21,6 +23,10 @@ function parseArgs(argv: string[]): RuntimeOptions {
     const arg = argv[i];
     if (arg === '--port' && argv[i + 1]) {
       port = Number.parseInt(argv[++i] || '', 10) || port;
+      continue;
+    }
+    if (arg === '--host' && argv[i + 1]) {
+      host = argv[++i] || host;
       continue;
     }
     if (arg === '--profile' && argv[i + 1]) {
@@ -40,7 +46,7 @@ function parseArgs(argv: string[]): RuntimeOptions {
     }
   }
 
-  return { port, profileName, settingsPath, authToken, insecure };
+  return { port, host, profileName, settingsPath, authToken, insecure };
 }
 
 function startRuntime(options: RuntimeOptions): void {
@@ -62,6 +68,7 @@ function startRuntime(options: RuntimeOptions): void {
 
   const server = startOpenAICompatProxyServer({
     profile,
+    host: options.host,
     port: options.port,
     authToken: options.authToken,
     insecure: options.insecure,

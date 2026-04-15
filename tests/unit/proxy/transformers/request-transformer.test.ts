@@ -28,6 +28,7 @@ describe('ProxyRequestTransformer', () => {
 
     expect(result.stream).toBe(true);
     expect(result.reasoning_effort).toBe('high');
+    expect(result.reasoning).toEqual({ enabled: true, effort: 'high' });
     expect(result.max_tokens).toBe(1024);
     expect(result.temperature).toBe(0.2);
     expect(result.top_p).toBe(0.9);
@@ -40,6 +41,43 @@ describe('ProxyRequestTransformer', () => {
       tool_call_id: 'toolu_1',
       content: 'v7.69.1',
     });
+  });
+
+  it('translates base64 image blocks into OpenAI image_url parts', () => {
+    const transformer = new ProxyRequestTransformer();
+    const result = transformer.transform({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Describe this image' },
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/png',
+                data: 'ZmFrZS1pbWFnZS1ieXRlcw==',
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Describe this image' },
+          {
+            type: 'image_url',
+            image_url: {
+              url: 'data:image/png;base64,ZmFrZS1pbWFnZS1ieXRlcw==',
+            },
+          },
+        ],
+      },
+    ]);
   });
 
   it('drops malformed optional fields but preserves the translated core request', () => {

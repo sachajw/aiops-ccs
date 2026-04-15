@@ -68,19 +68,41 @@ describe('proxy command e2e', () => {
       'utf8'
     );
 
-    const started = runCli(['proxy', 'start', 'hf', '--port', String(port)]);
+    const started = runCli(['proxy', 'start', 'hf', '--port', String(port), '--host', '127.0.0.1']);
     expect(started.status).toBe(0);
 
     const status = runCli(['proxy', 'status']);
     expect(status.stdout).toContain(`Proxy running on port ${port}`);
+    expect(status.stdout).toContain('Host: 127.0.0.1');
     expect(status.stdout).toContain('Profile: hf');
 
     const activate = runCli(['proxy', 'activate', '--shell', 'bash']);
     expect(activate.stdout).toContain(`export ANTHROPIC_BASE_URL='http://127.0.0.1:${port}'`);
     expect(activate.stdout).toMatch(/export ANTHROPIC_AUTH_TOKEN='[a-f0-9]{48}'/);
+    expect(activate.stdout).toContain("export DISABLE_TELEMETRY='1'");
+    expect(activate.stdout).toContain("export DISABLE_COST_WARNINGS='1'");
+    expect(activate.stdout).toContain("export API_TIMEOUT_MS='600000'");
+    expect(activate.stdout).toContain("export NO_PROXY='127.0.0.1,localhost'");
+
+    const activateFish = runCli(['proxy', 'activate', '--fish']);
+    expect(activateFish.stdout).toContain(`set -gx ANTHROPIC_BASE_URL 'http://127.0.0.1:${port}'`);
 
     const health = await fetch(`http://127.0.0.1:${port}/health`);
     expect(health.status).toBe(200);
+
+    const info = await fetch(`http://127.0.0.1:${port}/`);
+    expect(info.status).toBe(200);
+    await expect(info.json()).resolves.toMatchObject({
+      ok: true,
+      service: 'ccs-openai-compat-proxy',
+      bind: {
+        host: '127.0.0.1',
+        port,
+      },
+      profile: {
+        name: 'hf',
+      },
+    });
 
     const stopped = runCli(['proxy', 'stop']);
     expect(stopped.status).toBe(0);

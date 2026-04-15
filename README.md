@@ -67,6 +67,10 @@ ccs proxy start hf
 eval "$(ccs proxy activate)"
 ```
 
+The proxy also supports request-time `profile:model` selectors, scenario-based
+model routing through `proxy.routing`, and explicit activation helpers such as
+`ccs proxy activate --fish`.
+
 Guide: [OpenAI-Compatible Provider Routing](./docs/openai-compatible-providers.md)
 
 ### Related Project: claude-code-router

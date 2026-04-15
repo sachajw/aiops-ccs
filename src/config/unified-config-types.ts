@@ -498,6 +498,19 @@ export interface ProxyLocalConfig {
   auto_start: boolean;
 }
 
+export interface OpenAICompatProxyRoutingConfig {
+  default?: string;
+  background?: string;
+  think?: string;
+  longContext?: string;
+  webSearch?: string;
+  longContextThreshold?: number;
+}
+
+export interface OpenAICompatProxyConfig {
+  routing?: OpenAICompatProxyRoutingConfig;
+}
+
 /**
  * CLIProxy server configuration section.
  * Controls whether CCS uses local or remote CLIProxyAPI instance.
@@ -856,6 +869,8 @@ export interface UnifiedConfig {
   profiles: Record<string, ProfileConfig>;
   /** CLIProxy configuration */
   cliproxy: CLIProxyConfig;
+  /** OpenAI-compatible local proxy configuration */
+  proxy?: OpenAICompatProxyConfig;
   /** CCS-owned structured logging configuration */
   logging?: LoggingConfig;
   /** User preferences */
@@ -934,6 +949,12 @@ export const DEFAULT_CLIPROXY_SERVER_CONFIG: CliproxyServerConfig = {
   },
 };
 
+export const DEFAULT_OPENAI_COMPAT_PROXY_CONFIG: OpenAICompatProxyConfig = {
+  routing: {
+    longContextThreshold: 60_000,
+  },
+};
+
 /**
  * Create an empty unified config with defaults.
  */
@@ -956,6 +977,11 @@ export function createEmptyUnifiedConfig(): UnifiedConfig {
       auto_sync: true,
       routing: {
         strategy: 'round-robin',
+      },
+    },
+    proxy: {
+      routing: {
+        ...DEFAULT_OPENAI_COMPAT_PROXY_CONFIG.routing,
       },
     },
     logging: { ...DEFAULT_LOGGING_CONFIG },

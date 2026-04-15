@@ -225,10 +225,11 @@ export async function stopOpenAICompatProxy(): Promise<{ success: boolean; error
 
 export async function startOpenAICompatProxy(
   profile: OpenAICompatProfileConfig,
-  options: { port?: number; insecure?: boolean } = {}
+  options: { port?: number; host?: string; insecure?: boolean } = {}
 ): Promise<StartOpenAICompatProxyResult> {
   return withOpenAICompatProxyLock(async () => {
     const status = await getOpenAICompatProxyStatus();
+    const host = options.host?.trim() || status.host || '127.0.0.1';
     const port =
       typeof options.port === 'number'
         ? options.port
@@ -245,7 +246,12 @@ export async function startOpenAICompatProxy(
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       return { success: false, port, error: `Invalid port: ${port}` };
     }
-    if (status.running && status.profileName === profile.profileName && status.port === port) {
+    if (
+      status.running &&
+      status.profileName === profile.profileName &&
+      status.port === port &&
+      (status.host || '127.0.0.1') === host
+    ) {
       return {
         success: true,
         alreadyRunning: true,
@@ -304,6 +310,8 @@ export async function startOpenAICompatProxy(
           daemonEntry,
           '--port',
           String(port),
+          '--host',
+          host,
           '--profile',
           profile.profileName,
           '--settings-path',
@@ -323,6 +331,7 @@ export async function startOpenAICompatProxy(
       writeOpenAICompatProxySession({
         profileName: profile.profileName,
         settingsPath: profile.settingsPath,
+        host,
         port,
         baseUrl: profile.baseUrl,
         authToken,

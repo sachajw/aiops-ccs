@@ -9,6 +9,7 @@ import {
 export interface OpenAICompatProxySession {
   profileName: string;
   settingsPath: string;
+  host: string;
   port: number;
   baseUrl: string;
   authToken: string;

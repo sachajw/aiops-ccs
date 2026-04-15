@@ -36,12 +36,15 @@ function showHelp(): number {
   console.log('');
   console.log('Options:');
   console.log('  --port <n>        Override the local proxy port (default: 3456)');
+  console.log('  --host <addr>     Bind the proxy server to a specific host (default: 127.0.0.1)');
   console.log('  --shell <name>    activate only: auto|bash|zsh|fish|powershell');
+  console.log('  --fish            activate only: shorthand for --shell fish');
   console.log('  --insecure        Disable upstream TLS verification');
   console.log('');
   console.log('Examples:');
   console.log('  ccs proxy start hf');
   console.log('  eval "$(ccs proxy activate)"');
+  console.log('  ccs proxy activate --fish');
   console.log('  ccs proxy status');
   console.log('  ccs proxy stop');
   console.log('');
@@ -61,11 +64,14 @@ function resolveProfile(profileName: string) {
 async function handleStart(args: string[]): Promise<number> {
   const profileName = args.find((arg) => !arg.startsWith('-'));
   if (!profileName) {
-    console.error(fail('Usage: ccs proxy start <profile> [--port <n>] [--insecure]'));
+    console.error(
+      fail('Usage: ccs proxy start <profile> [--port <n>] [--host <addr>] [--insecure]')
+    );
     return 1;
   }
 
   const portValue = parseOptionValue(args, '--port');
+  const host = parseOptionValue(args, '--host');
   const port = portValue ? Number.parseInt(portValue, 10) || 3456 : undefined;
   let profile;
   try {
@@ -77,6 +83,7 @@ async function handleStart(args: string[]): Promise<number> {
 
   const result = await startOpenAICompatProxy(profile, {
     ...(port ? { port } : {}),
+    ...(host ? { host } : {}),
     insecure: args.includes('--insecure'),
   });
 
@@ -101,6 +108,10 @@ async function handleStatus(): Promise<number> {
   }
 
   console.log(ok(`Proxy running on port ${status.port}`));
+  if (status.host) {
+    console.log(`  Host: ${status.host}`);
+    console.log(`  Local URL: http://${status.host}:${status.port}`);
+  }
   console.log(`  Profile: ${status.profileName}`);
   console.log(`  Base URL: ${status.baseUrl}`);
   if (status.model) {
@@ -119,7 +130,7 @@ async function handleActivate(args: string[]): Promise<number> {
     return 1;
   }
 
-  const shell = detectShell(parseOptionValue(args, '--shell'));
+  const shell = detectShell(args.includes('--fish') ? 'fish' : parseOptionValue(args, '--shell'));
   let profile;
   try {
     profile = resolveProfile(status.profileName);
@@ -128,7 +139,13 @@ async function handleActivate(args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = buildOpenAICompatProxyEnv(profile, status.port, status.authToken);
+  const env = buildOpenAICompatProxyEnv(
+    profile,
+    status.port,
+    status.authToken,
+    undefined,
+    status.host || '127.0.0.1'
+  );
   Object.entries(env).forEach(([key, value]) => {
     console.log(formatExportLine(shell, key, value));
   });

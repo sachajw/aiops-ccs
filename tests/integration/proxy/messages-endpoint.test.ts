@@ -173,16 +173,44 @@ describe('openai proxy messages endpoint', () => {
     expect(body.error?.type).toBe('authentication_error');
   });
 
-  it('returns invalid_request_error for unsupported Anthropic content blocks', async () => {
+  it('translates supported Anthropic image blocks into OpenAI image_url content', async () => {
     const response = await requestProxy({
       model: 'hf-model',
-      messages: [{ role: 'user', content: [{ type: 'image' }] }],
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Describe this' },
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/png',
+                data: 'ZmFrZQ==',
+              },
+            },
+          ],
+        },
+      ],
     });
-    const body = (await response.json()) as { error?: { type?: string; message?: string } };
 
-    expect(response.status).toBe(400);
-    expect(body.error?.type).toBe('invalid_request_error');
-    expect(body.error?.message).toContain('is not supported');
+    expect(response.status).toBe(200);
+    const parsedUpstream = upstreamBody as {
+      messages?: Array<{
+        role: string;
+        content: Array<{ type: string; text?: string; image_url?: { url?: string } }>;
+      }>;
+    };
+    expect(parsedUpstream.messages?.[0]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Describe this' },
+        {
+          type: 'image_url',
+          image_url: { url: 'data:image/png;base64,ZmFrZQ==' },
+        },
+      ],
+    });
   });
 
   it('accepts query strings and trailing slashes on the messages route', async () => {

@@ -40,6 +40,19 @@ export interface CLIProxyVariantsConfig {
   [profileName: string]: CLIProxyVariantConfig;
 }
 
+export interface OpenAICompatProxyRoutingConfig {
+  default?: string;
+  background?: string;
+  think?: string;
+  longContext?: string;
+  webSearch?: string;
+  longContextThreshold?: number;
+}
+
+export interface OpenAICompatProxyConfig {
+  routing?: OpenAICompatProxyRoutingConfig;
+}
+
 /**
  * Main CCS configuration
  * Located at: ~/.ccs/config.json
@@ -51,6 +64,8 @@ export interface Config {
   profile_targets?: Record<string, TargetType>;
   /** User-defined CLIProxy profile variants (optional) */
   cliproxy?: CLIProxyVariantsConfig;
+  /** OpenAI-compatible local proxy configuration (optional) */
+  proxy?: OpenAICompatProxyConfig;
   /** Legacy continuity inheritance mapping (profile -> source account) */
   continuity_inherit_from_account?: Record<string, string>;
 }

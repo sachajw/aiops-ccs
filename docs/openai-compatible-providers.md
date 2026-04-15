@@ -68,8 +68,22 @@ ccs proxy status
 ccs proxy stop
 ```
 
-`ccs proxy activate` prints the `ANTHROPIC_*` exports needed for a local
-Anthropic-compatible session against the running proxy.
+Useful variants:
+
+```bash
+ccs proxy start hf --host 127.0.0.1
+ccs proxy activate --fish
+```
+
+`ccs proxy activate` now prints the full local runtime contract:
+
+- `ANTHROPIC_BASE_URL`
+- `ANTHROPIC_AUTH_TOKEN`
+- `ANTHROPIC_MODEL` plus tier defaults when present
+- `DISABLE_TELEMETRY`
+- `DISABLE_COST_WARNINGS`
+- `API_TIMEOUT_MS`
+- `NO_PROXY`
 
 ## One Active Proxy Profile
 
@@ -81,6 +95,56 @@ The current runtime is a single local proxy daemon.
 
 This is intentional to avoid breaking an in-flight Claude session by swapping
 its upstream provider out from under it.
+
+## Request-Time Routing
+
+The proxy is no longer limited to the startup profile's default model.
+
+Supported request-time selectors:
+
+- `profile:model`
+  Example: `deepseek:deepseek-reasoner`
+- `profile`
+  Example: `openrouter`
+- plain model ids
+  Example: `deepseek-chat`
+
+Routing behavior:
+
+1. `profile:model` wins immediately.
+2. Scenario routing may override the active profile when configured.
+3. Plain model ids are matched against the configured OpenAI-compatible
+   profiles before falling back to the active profile.
+
+This means a Claude session launched through one compatible profile can still
+request another compatible profile/model when the proxy can resolve it safely.
+
+## Scenario Routing
+
+Scenario routing is now supported through `proxy.routing` in your CCS config.
+
+Example `~/.ccs/config.yaml`:
+
+```yaml
+proxy:
+  routing:
+    default: "deepseek:deepseek-chat"
+    background: "ollama:qwen2.5-coder:0.5b"
+    think: "deepseek:deepseek-reasoner"
+    longContext: "openrouter:google/gemini-2.5-pro"
+    longContextThreshold: 60000
+    webSearch: "openrouter:perplexity/sonar-pro"
+```
+
+Current scenario detection:
+
+- `background`: requested model contains `haiku`
+- `think`: Anthropic `thinking` is enabled
+- `longContext`: estimated request tokens exceed `longContextThreshold`
+- `webSearch`: tool list includes `web_search`
+- `default`: fallback selector when the above do not apply
+
+Routing decisions are logged through CCS structured logs.
 
 ## How Profile Detection Works
 
@@ -101,6 +165,79 @@ OpenAI-compatible endpoints such as:
 - `http://localhost:11434`
 
 are routed through the local proxy for Claude-target launches.
+
+## Provider Setup
+
+### DeepSeek
+
+Use a settings profile whose env looks like:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/v1",
+    "ANTHROPIC_AUTH_TOKEN": "sk-...",
+    "ANTHROPIC_MODEL": "deepseek-chat",
+    "CCS_DROID_PROVIDER": "generic-chat-completion-api"
+  }
+}
+```
+
+Typical override target:
+
+- `deepseek:deepseek-reasoner`
+
+### OpenRouter
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api/v1",
+    "ANTHROPIC_AUTH_TOKEN": "sk-or-...",
+    "ANTHROPIC_MODEL": "openai/gpt-4.1-mini",
+    "CCS_DROID_PROVIDER": "generic-chat-completion-api"
+  }
+}
+```
+
+Useful when you want:
+
+- model fan-out behind one provider profile
+- long-context or web-search scenario targets
+
+### Ollama / Local Gateways
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:11434",
+    "ANTHROPIC_AUTH_TOKEN": "ollama",
+    "ANTHROPIC_MODEL": "qwen3-coder",
+    "CCS_DROID_PROVIDER": "generic-chat-completion-api"
+  }
+}
+```
+
+For self-signed HTTPS gateways, add `CCS_OPENAI_PROXY_INSECURE=1`.
+
+### DashScope / Qwen Compatible Mode
+
+DashScope's compatible endpoint works even when older settings files still
+carry a stale Anthropic-style provider hint:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://dashscope-us.aliyuncs.com/compatible-mode/v1",
+    "ANTHROPIC_AUTH_TOKEN": "sk-...",
+    "ANTHROPIC_MODEL": "qwen3.6-plus",
+    "CCS_DROID_PROVIDER": "anthropic"
+  }
+}
+```
+
+CCS now infers the OpenAI-compatible route from the base URL and does not let
+that stale provider hint block proxy routing.
 
 ## Self-Signed TLS
 
@@ -124,9 +261,38 @@ That flag is respected by both:
 
 - `ccs <profile>` with Claude target: auto-starts the local proxy when needed
 - `ccs proxy start <profile>`: starts the proxy explicitly
+- `GET /`: proxy info and bound profile details
 - `GET /health`: proxy liveness check
 - `GET /v1/models`: local view of the configured model mapping
 - `POST /v1/messages`: Anthropic-compatible request entrypoint
+
+## Troubleshooting
+
+### Missing or invalid local proxy token
+
+- Re-run `eval "$(ccs proxy activate)"`
+- Check `ccs proxy status` and confirm the expected profile is running
+
+### Self-signed or private CA upstream
+
+- Add `CCS_OPENAI_PROXY_INSECURE=1` to the profile settings
+- Restart the proxy after changing the setting
+
+### Port conflict on `3456`
+
+- Start with a fixed port: `ccs proxy start hf --port 3457`
+- Re-run `ccs proxy activate` after changing the port
+
+### Provider returns `429` or empty upstream output
+
+- CCS now preserves upstream rate-limit errors and retry headers
+- Empty or malformed provider JSON is returned as Anthropic-style `api_error`
+
+### Requests route to the wrong model/profile
+
+- Use an explicit selector such as `profile:model`
+- Review `proxy.routing` if scenario routing is enabled
+- Check CCS structured logs in `~/.ccs/logs/current.jsonl` for routing decisions
 
 ## Validation
 
@@ -134,19 +300,11 @@ The shipped coverage includes:
 
 - unit tests for OpenAI-compatible profile detection
 - unit tests for Anthropic -> OpenAI request translation
+- unit tests for request-time profile/model routing and scenario routing
 - unit tests for multi-line SSE parsing
 - integration tests for `/v1/messages` request/response translation
+- integration tests for rate limits, empty upstream responses, timeout handling,
+  thinking/tool-call chunk streaming, and request-time routing
 - integration tests for daemon lifecycle and `/health` / `/v1/models`
 - e2e tests for `ccs proxy` lifecycle
 - e2e tests for `ccs <profile>` auto-routing through a mock upstream
-
-## Current Scope
-
-The current implementation focuses on the core routing path:
-
-- local proxy lifecycle
-- Anthropic/OpenAI request-response translation
-- Claude-target settings profile auto-routing
-
-Scenario-based routing and token-count-driven model switching remain follow-up
-work if they are needed beyond the base provider-routing flow.
