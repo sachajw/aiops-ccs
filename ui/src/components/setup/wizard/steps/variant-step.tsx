@@ -87,7 +87,9 @@ export function VariantStep({
                       'text-[10px] h-4 px-1.5 border-transparent',
                       selectedAccountIdentity.audience === 'business'
                         ? 'bg-sky-500/12 text-sky-700 dark:text-sky-300'
-                        : 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
+                        : selectedAccountIdentity.audience === 'free'
+                          ? 'bg-slate-200/70 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200'
+                          : 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300'
                     )}
                   >
                     {selectedAccountIdentity.audienceLabel}

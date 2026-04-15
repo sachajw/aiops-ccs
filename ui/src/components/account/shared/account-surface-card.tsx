@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { PRIVACY_BLUR_CLASS } from '@/contexts/privacy-context';
 import type { UnifiedQuotaResult } from '@/hooks/use-cliproxy-stats';
-import { formatAccountVariantPart, getAccountIdentityPresentation } from '@/lib/account-identity';
+import { getAccountIdentityPresentation } from '@/lib/account-identity';
 import { cn } from '@/lib/utils';
 import { Pause, Star, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { AccountQuotaPanel } from './account-quota-panel';
 
 type AccountSurfaceMode = 'compact' | 'detailed';
+type AccountAudience = 'business' | 'free' | 'personal' | 'unknown';
 type AccountTier = 'free' | 'pro' | 'ultra' | 'unknown';
 
 interface AccountSurfaceCardProps {
@@ -36,9 +37,13 @@ interface AccountSurfaceCardProps {
   className?: string;
 }
 
-function getAudienceBadgeClass(audience: 'business' | 'personal' | 'unknown') {
+function getAudienceBadgeClass(audience: AccountAudience) {
   if (audience === 'business') {
     return 'bg-sky-500/12 text-sky-700 dark:text-sky-300';
+  }
+
+  if (audience === 'free') {
+    return 'bg-slate-200/70 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200';
   }
 
   if (audience === 'personal') {
@@ -54,18 +59,27 @@ function getTierBadgeClass(tier: AccountTier | undefined) {
     : 'bg-yellow-500/15 text-yellow-700 dark:bg-yellow-500/20 dark:text-yellow-400';
 }
 
-function getCompactAudienceBadgeLabel(
-  audience: 'business' | 'personal' | 'unknown',
-  t: (key: string) => string
-) {
+function getCompactAudienceBadgeLabel(audience: AccountAudience, t: (key: string) => string) {
   if (audience === 'business') return t('accountSurfaceCard.business');
+  if (audience === 'free') return t('accountSurfaceCard.free');
   if (audience === 'personal') return t('accountSurfaceCard.personal');
   return '?';
 }
 
-function getCompactDetailBadgeClass(audience: 'business' | 'personal' | 'unknown') {
+function getDetailedAudienceLabel(audience: AccountAudience): string | null {
+  if (audience === 'business') return 'Business';
+  if (audience === 'free') return 'Free';
+  if (audience === 'personal') return 'Personal';
+  return null;
+}
+
+function getCompactDetailBadgeClass(audience: AccountAudience) {
   if (audience === 'business') {
     return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-200';
+  }
+
+  if (audience === 'free') {
+    return 'border-slate-300/70 bg-slate-100/80 text-slate-700 dark:border-slate-500/40 dark:bg-slate-700/30 dark:text-slate-200';
   }
 
   if (audience === 'personal') {
@@ -88,12 +102,15 @@ function resolveEffectiveTier(
   return tier;
 }
 
-function getCodexPlanDetailLabel(quota: UnifiedQuotaResult | undefined): string | null {
+function getCodexPlanAudience(quota: UnifiedQuotaResult | undefined): AccountAudience {
   if (!quota || !('planType' in quota) || !quota.planType) {
-    return null;
+    return 'unknown';
   }
 
-  return formatAccountVariantPart(quota.planType);
+  if (quota.planType === 'team') return 'business';
+  if (quota.planType === 'free') return 'free';
+  if (quota.planType === 'plus') return 'personal';
+  return 'unknown';
 }
 
 export function AccountSurfaceCard({
@@ -124,10 +141,13 @@ export function AccountSurfaceCard({
   const title = displayEmail || identity.email || accountId;
   const normalizedProvider = provider.toLowerCase();
   const effectiveTier = resolveEffectiveTier(tier, quota);
-  const codexPlanDetailLabel =
-    normalizedProvider === 'codex' ? getCodexPlanDetailLabel(quota) : null;
-  const resolvedDetailLabel = identity.detailLabel ?? codexPlanDetailLabel;
-  const resolvedCompactDetailLabel = identity.compactDetailLabel ?? codexPlanDetailLabel;
+  const codexPlanAudience =
+    normalizedProvider === 'codex' ? getCodexPlanAudience(quota) : 'unknown';
+  const effectiveAudience = identity.audience !== 'unknown' ? identity.audience : codexPlanAudience;
+  const effectiveAudienceLabel =
+    identity.audienceLabel ?? getDetailedAudienceLabel(effectiveAudience);
+  const resolvedDetailLabel = identity.detailLabel;
+  const resolvedCompactDetailLabel = identity.compactDetailLabel;
   const showTierBadge =
     (normalizedProvider === 'agy' ||
       normalizedProvider === 'antigravity' ||
@@ -148,17 +168,15 @@ export function AccountSurfaceCard({
           {effectiveTier}
         </span>
       )}
-      {identity.audienceLabel && (
+      {effectiveAudienceLabel && (
         <span
-          title={identity.audienceLabel}
+          title={effectiveAudienceLabel}
           className={cn(
             'text-[8px] font-semibold px-1.5 py-0.5 rounded-md shrink-0',
-            identity.audience === 'business'
-              ? 'bg-sky-500/15 text-sky-700 dark:bg-sky-500/25 dark:text-sky-300'
-              : 'bg-emerald-500/15 text-emerald-700 dark:bg-emerald-500/25 dark:text-emerald-300'
+            getAudienceBadgeClass(effectiveAudience)
           )}
         >
-          {getCompactAudienceBadgeLabel(identity.audience, t)}
+          {getCompactAudienceBadgeLabel(effectiveAudience, t)}
         </span>
       )}
       {resolvedCompactDetailLabel && (
@@ -166,7 +184,7 @@ export function AccountSurfaceCard({
           title={resolvedDetailLabel ?? resolvedCompactDetailLabel}
           className={cn(
             'text-[8px] font-semibold px-1.5 py-0.5 rounded-md border shrink-0',
-            getCompactDetailBadgeClass(identity.audience)
+            getCompactDetailBadgeClass(effectiveAudience)
           )}
         >
           {resolvedCompactDetailLabel}
@@ -227,15 +245,15 @@ export function AccountSurfaceCard({
                 {title}
               </span>
               {isCompact && (compactMetaBadges ?? defaultCompactMetaBadges)}
-              {!isCompact && identity.audienceLabel && (
+              {!isCompact && effectiveAudienceLabel && (
                 <Badge
                   variant="outline"
                   className={cn(
                     'text-[10px] h-4 px-1.5 border-transparent',
-                    getAudienceBadgeClass(identity.audience)
+                    getAudienceBadgeClass(effectiveAudience)
                   )}
                 >
-                  {identity.audienceLabel}
+                  {effectiveAudienceLabel}
                 </Badge>
               )}
               {!isCompact && resolvedDetailLabel && (

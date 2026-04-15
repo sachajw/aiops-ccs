@@ -1,10 +1,11 @@
-const PERSONAL_PLAN_PARTS = new Set(['free', 'plus', 'pro']);
+const FREE_PLAN_PARTS = new Set(['free']);
+const PERSONAL_PLAN_PARTS = new Set(['plus', 'pro']);
 const BUSINESS_PLAN_PARTS = new Set(['team']);
 
 // Keep variant parsing aligned with src/cliproxy/accounts/email-account-identity.ts.
 // This browser copy stays local because the server module is not bundle-safe for the UI.
 
-export type AccountAudience = 'business' | 'personal' | 'unknown';
+export type AccountAudience = 'business' | 'free' | 'personal' | 'unknown';
 
 export interface AccountIdentityPresentation {
   email: string;
@@ -105,9 +106,14 @@ function formatWorkspaceLabel(parts: string[]): {
 
   const extraLabel = parts.map(formatAccountVariantPart).filter(Boolean).join(' · ');
   return {
-    detailLabel: extraLabel || 'Team', // TODO i18n: missing key for team fallback
-    compactDetailLabel: extraLabel || 'Team',
+    detailLabel: extraLabel || null,
+    compactDetailLabel: extraLabel || null,
   };
+}
+
+function formatAudienceDetail(parts: string[]): string | null {
+  const label = parts.map(formatAccountVariantPart).filter(Boolean).join(' · ');
+  return label || null;
 }
 
 export function extractAccountVariantKey(
@@ -166,14 +172,21 @@ export function getAccountIdentityPresentation(
     };
   }
 
+  if (suffix && FREE_PLAN_PARTS.has(suffix)) {
+    const detailLabel = formatAudienceDetail(parts.slice(0, -1));
+    const inlineLabel = ['Free', detailLabel].filter(Boolean).join(' · '); // TODO i18n: missing key for Free
+    return {
+      email: resolvedEmail,
+      audience: 'free',
+      audienceLabel: 'Free',
+      detailLabel,
+      compactDetailLabel: detailLabel,
+      inlineLabel,
+    };
+  }
+
   if (suffix && PERSONAL_PLAN_PARTS.has(suffix)) {
-    const detailParts = [
-      formatAccountVariantPart(suffix),
-      ...parts.slice(0, -1).map(formatAccountVariantPart),
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    const detailLabel = detailParts || formatAccountVariantPart(suffix);
+    const detailLabel = formatAudienceDetail(parts.slice(0, -1));
     const inlineLabel = ['Personal', detailLabel].filter(Boolean).join(' · '); // TODO i18n: missing key for Personal
     return {
       email: resolvedEmail,

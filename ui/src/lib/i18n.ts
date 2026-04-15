@@ -1701,6 +1701,7 @@ const resources = {
       },
       accountSurfaceCard: {
         business: 'Biz',
+        free: 'Free',
         personal: 'Pers',
         variant: 'Variant',
       },
@@ -4049,6 +4050,7 @@ const resources = {
       },
       accountSurfaceCard: {
         business: '企业',
+        free: '免费',
         personal: '个人',
         variant: '变体',
       },
@@ -6469,6 +6471,7 @@ const resources = {
       },
       accountSurfaceCard: {
         business: 'Biz',
+        free: 'Miễn phí',
         personal: 'Cá nhân',
         variant: 'Biến thể',
       },
@@ -8671,6 +8674,7 @@ const resources = {
       },
       accountSurfaceCard: {
         business: 'ビジネス',
+        free: '無料',
         personal: '個人',
         variant: 'バリアント',
       },

@@ -87,11 +87,11 @@ const groupedAccount: AccountData = {
       isDefault: true,
       successCount: 4,
       failureCount: 1,
-      audience: 'personal',
-      audienceLabel: 'Personal',
-      detailLabel: 'Free',
-      compactDetailLabel: 'Free',
-      inlineLabel: 'Personal · Free',
+      audience: 'free',
+      audienceLabel: 'Free',
+      detailLabel: null,
+      compactDetailLabel: null,
+      inlineLabel: 'Free',
     },
   ],
 };
@@ -99,9 +99,11 @@ const groupedAccount: AccountData = {
 const groupedAccountWithProPersonal: AccountData = {
   ...groupedAccount,
   variants: groupedAccount.variants?.map((variant) =>
-    variant.audience === 'personal'
+    variant.audience === 'free'
       ? {
           ...variant,
+          audience: 'personal',
+          audienceLabel: 'Personal',
           detailLabel: 'Pro',
           compactDetailLabel: 'Pro',
           inlineLabel: 'Personal · Pro',
@@ -148,9 +150,7 @@ describe('AccountCard grouped quota tooltip', () => {
       />
     );
 
-    expect(
-      screen.getByTitle('Business · Workspace 04a0f049 • Personal · Free')
-    ).toBeInTheDocument();
+    expect(screen.getByTitle('Business · Workspace 04a0f049 • Free')).toBeInTheDocument();
     expect(screen.getByText('Biz')).toBeInTheDocument();
 
     await userEvent.hover(screen.getByText('Business · Workspace 04a0f049'));
@@ -164,7 +164,14 @@ describe('AccountCard grouped quota tooltip', () => {
     expect(tooltipContent?.className).toContain('text-popover-foreground');
     expect(tooltipContent?.className).toContain('max-w-[calc(100vw-2rem)]');
 
-    await userEvent.hover(screen.getByText('Personal · Free'));
+    const freeLabels = screen.getAllByText('Free');
+    const quotaLabel = freeLabels[freeLabels.length - 1];
+    expect(quotaLabel).toBeDefined();
+    if (!quotaLabel) {
+      throw new Error('Expected a Free quota label');
+    }
+
+    await userEvent.hover(quotaLabel);
     const personalPlan = (await screen.findAllByText('Plan: free')).find((node) =>
       node.closest('[data-slot="tooltip-content"]')
     );
@@ -193,6 +200,6 @@ describe('AccountCard grouped quota tooltip', () => {
 
     expect(screen.getByTitle('Business · Workspace 04a0f049 • Personal · Pro')).toBeInTheDocument();
     expect(screen.getByText('Personal · Pro')).toBeInTheDocument();
-    expect(screen.queryByText('Personal · Free')).not.toBeInTheDocument();
+    expect(screen.queryByText('Free')).not.toBeInTheDocument();
   });
 });

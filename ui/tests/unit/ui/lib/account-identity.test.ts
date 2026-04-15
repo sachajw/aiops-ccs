@@ -39,14 +39,33 @@ describe('account identity presentation', () => {
     ).toBe('Business · Workspace 04a0f049');
   });
 
-  it('formats personal codex plans deliberately instead of leaking raw free suffixes', () => {
+  it('classifies free codex accounts as a standalone audience', () => {
+    const presentation = getAccountIdentityPresentation(
+      'kaidu.kd@gmail.com',
+      'kaidu.kd@gmail.com',
+      'codex-kaidu.kd@gmail.com-free.json'
+    );
+
+    expect(presentation.audience).toBe('free');
+    expect(presentation.audienceLabel).toBe('Free');
+    expect(presentation.detailLabel).toBeNull();
     expect(
       formatAccountDisplayName(
         'kaidu.kd@gmail.com',
         'kaidu.kd@gmail.com',
         'codex-kaidu.kd@gmail.com-free.json'
       )
-    ).toBe('kaidu.kd@gmail.com (Personal · Free)');
+    ).toBe('kaidu.kd@gmail.com (Free)');
+  });
+
+  it('collapses paid codex personal plans into a single personal audience label', () => {
+    expect(
+      formatAccountDisplayName(
+        'kaidu.kd@gmail.com',
+        'kaidu.kd@gmail.com',
+        'codex-kaidu.kd@gmail.com-plus.json'
+      )
+    ).toBe('kaidu.kd@gmail.com (Personal)');
   });
 
   it('leaves plain accounts without inferred state untouched', () => {

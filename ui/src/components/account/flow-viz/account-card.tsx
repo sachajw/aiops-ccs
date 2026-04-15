@@ -13,7 +13,6 @@ import {
   getProviderResetTime,
   getQuotaFailureInfo,
 } from '@/lib/utils';
-import { formatAccountVariantPart } from '@/lib/account-identity';
 import { GripVertical, Loader2, Pause, Play } from 'lucide-react';
 import {
   useAccountQuota,
@@ -28,6 +27,7 @@ import { AccountCardStats } from './account-card-stats';
 import { cleanEmail } from './utils';
 
 type Zone = 'left' | 'right' | 'top' | 'bottom';
+type AccountAudience = 'business' | 'free' | 'personal' | 'unknown';
 
 const QUOTA_PROVIDER_ALIASES = [
   'antigravity',
@@ -88,46 +88,57 @@ function getCompactQuotaColor(percentage: number) {
   return 'bg-red-500';
 }
 
-function getCodexPlanDetailLabel(quota: unknown): string | null {
+function getCodexPlanAudience(quota: unknown): AccountAudience {
   if (!quota || typeof quota !== 'object' || !('planType' in quota)) {
-    return null;
+    return 'unknown';
   }
 
   const planType = (quota as { planType?: unknown }).planType;
   if (typeof planType !== 'string' || planType.trim().length === 0) {
-    return null;
+    return 'unknown';
   }
 
-  return formatAccountVariantPart(planType);
+  if (planType === 'team') return 'business';
+  if (planType === 'free') return 'free';
+  if (planType === 'plus') return 'personal';
+  return 'unknown';
 }
 
-function getVariantDetailLabel(
+function getVariantDetailLabel(variant: {
+  audience: AccountAudience;
+  detailLabel?: string | null;
+  compactDetailLabel?: string | null;
+}) {
+  return variant.detailLabel ?? variant.compactDetailLabel ?? null;
+}
+
+function getVariantCompactDetailLabel(variant: {
+  audience: AccountAudience;
+  compactDetailLabel?: string | null;
+  detailLabel?: string | null;
+}) {
+  return variant.compactDetailLabel ?? variant.detailLabel ?? null;
+}
+
+function getDetailedAudienceLabel(audience: AccountAudience): string | null {
+  if (audience === 'business') return 'Business';
+  if (audience === 'free') return 'Free';
+  if (audience === 'personal') return 'Personal';
+  return null;
+}
+
+function getVariantAudience(
   variant: {
-    audience: string;
-    detailLabel?: string | null;
-    compactDetailLabel?: string | null;
+    audience: AccountAudience;
   },
   quota?: unknown
 ) {
-  const codexPlanDetail = getCodexPlanDetailLabel(quota);
-  return variant.detailLabel ?? variant.compactDetailLabel ?? codexPlanDetail;
-}
-
-function getVariantCompactDetailLabel(
-  variant: {
-    audience: string;
-    compactDetailLabel?: string | null;
-    detailLabel?: string | null;
-  },
-  quota?: unknown
-) {
-  const codexPlanDetail = getCodexPlanDetailLabel(quota);
-  return variant.compactDetailLabel ?? variant.detailLabel ?? codexPlanDetail;
+  return variant.audience !== 'unknown' ? variant.audience : getCodexPlanAudience(quota);
 }
 
 function getVariantInlineLabel(
   variant: {
-    audience: string;
+    audience: AccountAudience;
     audienceLabel?: string | null;
     detailLabel?: string | null;
     compactDetailLabel?: string | null;
@@ -135,14 +146,16 @@ function getVariantInlineLabel(
   },
   quota?: unknown
 ) {
-  const detailLabel = getVariantDetailLabel(variant, quota);
-  const composedLabel = [variant.audienceLabel, detailLabel].filter(Boolean).join(' · ');
+  const detailLabel = getVariantDetailLabel(variant);
+  const audienceLabel =
+    variant.audienceLabel ?? getDetailedAudienceLabel(getVariantAudience(variant, quota));
+  const composedLabel = [audienceLabel, detailLabel].filter(Boolean).join(' · ');
   return composedLabel || variant.inlineLabel || null;
 }
 
 function getVariantMarkerLabel(
   variant: {
-    audience: string;
+    audience: AccountAudience;
     audienceLabel?: string | null;
     detailLabel?: string | null;
     compactDetailLabel?: string | null;
@@ -150,23 +163,30 @@ function getVariantMarkerLabel(
   audienceCounts: Map<string, number>,
   quota?: unknown
 ) {
-  const compactDetailLabel = getVariantCompactDetailLabel(variant, quota);
-  if (variant.audience === 'business') {
+  const audience = getVariantAudience(variant, quota);
+  const compactDetailLabel = getVariantCompactDetailLabel(variant);
+  if (audience === 'business') {
     const businessVariantCount = audienceCounts.get('business') ?? 0;
     return businessVariantCount > 1 && compactDetailLabel ? compactDetailLabel : 'Biz';
   }
-  if (variant.audience === 'personal') {
+  if (audience === 'free') {
+    return compactDetailLabel ?? 'Free';
+  }
+  if (audience === 'personal') {
     return compactDetailLabel ?? 'Pers';
   }
 
   const normalizedFallback =
-    compactDetailLabel?.trim() || variant.audienceLabel?.trim() || variant.detailLabel?.trim();
+    compactDetailLabel?.trim() ||
+    variant.audienceLabel?.trim() ||
+    getDetailedAudienceLabel(audience) ||
+    variant.detailLabel?.trim();
   return normalizedFallback?.[0]?.toUpperCase() ?? '?';
 }
 
 function getGroupedVariantSummaryLabel(
   variants: Array<{
-    audience: string;
+    audience: AccountAudience;
     audienceLabel?: string | null;
     detailLabel?: string | null;
     compactDetailLabel?: string | null;
@@ -176,7 +196,10 @@ function getGroupedVariantSummaryLabel(
 ) {
   const audiences = new Set(variants.map((variant) => variant.audience));
   const hasDistinctDetails = variants.some((variant, index) =>
-    Boolean(getVariantCompactDetailLabel(variant, quotas[index]))
+    Boolean(
+      getVariantCompactDetailLabel(variant) ||
+      getDetailedAudienceLabel(getVariantAudience(variant, quotas[index]))
+    )
   );
 
   if (
@@ -274,9 +297,11 @@ export function AccountCard({
                 index > 0 && 'border-l border-border/50',
                 variant.audience === 'business'
                   ? 'bg-sky-500/12 text-sky-700 dark:bg-sky-500/20 dark:text-sky-300'
-                  : variant.audience === 'personal'
-                    ? 'bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
-                    : 'bg-muted text-muted-foreground'
+                  : variant.audience === 'free'
+                    ? 'bg-slate-200/70 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200'
+                    : variant.audience === 'personal'
+                      ? 'bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                      : 'bg-muted text-muted-foreground'
               )}
             >
               {getVariantMarkerLabel(

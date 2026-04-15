@@ -57,7 +57,7 @@ describe('AccountSurfaceCard', () => {
     expect(screen.getByText('pro')).toBeInTheDocument();
   });
 
-  it('shows both personal identity and free-tier detail for compact Codex cards', () => {
+  it('shows free Codex accounts as a single standalone audience badge', () => {
     render(
       <AccountSurfaceCard
         mode="compact"
@@ -70,12 +70,12 @@ describe('AccountSurfaceCard', () => {
       />
     );
 
-    expect(screen.getByText('Pers')).toBeInTheDocument();
-    expect(screen.getByTitle('Personal')).toBeInTheDocument();
     expect(screen.getByText('Free')).toBeInTheDocument();
+    expect(screen.getByTitle('Free')).toBeInTheDocument();
+    expect(screen.queryByText('Pers')).not.toBeInTheDocument();
   });
 
-  it('keeps richer token-derived Codex personal detail when live quota planType is coarser', () => {
+  it('keeps the simplified personal audience when live quota planType is coarser', () => {
     render(
       <AccountSurfaceCard
         mode="compact"
@@ -89,7 +89,24 @@ describe('AccountSurfaceCard', () => {
       />
     );
 
-    expect(screen.getByText('Pro')).toBeInTheDocument();
+    expect(screen.getByText('Pers')).toBeInTheDocument();
     expect(screen.queryByText('Free')).not.toBeInTheDocument();
+  });
+
+  it('falls back to a single free badge when Codex quota detects a free plan', () => {
+    render(
+      <AccountSurfaceCard
+        mode="compact"
+        provider="codex"
+        accountId="user@example.com"
+        email="user@example.com"
+        displayEmail="user@example.com"
+        quota={createCodexQuotaResult({ planType: 'free' })}
+        showQuota={false}
+      />
+    );
+
+    expect(screen.getByText('Free')).toBeInTheDocument();
+    expect(screen.queryByText('Pers')).not.toBeInTheDocument();
   });
 });
