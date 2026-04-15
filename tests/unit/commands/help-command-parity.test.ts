@@ -53,6 +53,9 @@ describe('help command parity', () => {
     expect(rendered.includes('gitlab')).toBe(true);
     expect(rendered.includes('codebuddy')).toBe(true);
     expect(rendered.includes('kilo')).toBe(true);
+    expect(rendered.includes('--gitlab-token-login')).toBe(true);
+    expect(rendered.includes('--token-login')).toBe(true);
+    expect(rendered.includes('--gitlab-url <url>')).toBe(true);
   });
 
   test('kiro topic documents IDC and callback flags', async () => {

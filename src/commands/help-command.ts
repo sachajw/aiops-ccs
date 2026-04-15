@@ -1,4 +1,5 @@
 import packageJson from '../../package.json';
+import type { CLIProxyProvider } from '../cliproxy';
 import { color, dim, header, initUI, subheader } from '../utils/ui';
 import {
   BUILTIN_PROVIDER_SHORTCUTS,
@@ -82,7 +83,77 @@ async function showProvidersHelp(writeLine: HelpWriter): Promise<void> {
     ],
     writeLine
   );
+  writeCommandTable(
+    'GitLab Duo Flags',
+    [
+      {
+        name: 'ccs gitlab --auth --gitlab-token-login',
+        summary: 'Authenticate with a GitLab Personal Access Token',
+      },
+      {
+        name: 'ccs gitlab --auth --token-login',
+        summary: 'Legacy alias for GitLab PAT login (still supported)',
+      },
+      {
+        name: 'ccs gitlab --auth --gitlab-url <url>',
+        summary: 'Use a self-hosted GitLab base URL during OAuth or PAT auth',
+      },
+    ],
+    writeLine
+  );
   writeLine(`  ${dim('Deep help: ccs cliproxy --help | ccs api --help')}`);
+  writeLine('');
+}
+
+export async function showProviderShortcutHelp(
+  provider: CLIProxyProvider,
+  writeLine: HelpWriter = console.log
+): Promise<void> {
+  if (provider === 'kiro') {
+    await showKiroHelp(writeLine);
+    return;
+  }
+
+  await initUI();
+
+  const providerEntry = BUILTIN_PROVIDER_SHORTCUTS.find((entry) => entry.name === provider);
+  writeLine(header(`CCS ${provider} Shortcut Help`));
+  writeLine('');
+  writeLine(`  ${providerEntry?.summary || 'CLIProxy OAuth provider shortcut'}.`);
+  writeLine('');
+  writeCommandTable(
+    'Common Commands',
+    [
+      { name: `ccs ${provider} --auth`, summary: 'Authenticate the provider account via CLIProxy' },
+      { name: `ccs ${provider} --accounts`, summary: 'List or manage stored CLIProxy accounts' },
+      { name: `ccs ${provider} --config`, summary: 'Open the provider config flow' },
+      { name: `ccs ${provider} "task"`, summary: 'Run Claude through this provider shortcut' },
+    ],
+    writeLine
+  );
+
+  if (provider === 'gitlab') {
+    writeCommandTable(
+      'GitLab Duo Flags',
+      [
+        {
+          name: '--gitlab-token-login',
+          summary: 'Use a GitLab Personal Access Token instead of browser OAuth',
+        },
+        {
+          name: '--token-login',
+          summary: 'Legacy alias for `--gitlab-token-login`',
+        },
+        {
+          name: '--gitlab-url <url>',
+          summary: 'Target a self-hosted GitLab base URL',
+        },
+      ],
+      writeLine
+    );
+  }
+
+  writeLine(`  ${dim('See also: ccs help providers | ccs cliproxy --help')}`);
   writeLine('');
 }
 

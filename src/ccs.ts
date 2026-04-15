@@ -65,7 +65,8 @@ import {
   resolveOfficialChannelsLaunchPlan,
 } from './channels/official-channels-runtime';
 import { getOfficialChannelReadiness } from './channels/official-channels-store';
-import { isCursorSubcommandToken } from './cursor/constants';
+import { isCursorSubcommandToken, shouldUseCursorCliproxyShortcut } from './cursor/constants';
+import { isCLIProxyProvider } from './cliproxy/provider-capabilities';
 
 // Import centralized error handling
 import { handleError, runCleanup } from './errors';
@@ -123,7 +124,6 @@ interface RuntimeReasoningResolution {
   sourceDisplay: string | undefined;
 }
 
-const CURSOR_CLIPROXY_SHORTCUT_FLAGS = new Set(['--auth', '--logout', '--config', '--accounts']);
 const CODEX_RUNTIME_REASONING_LEVELS = new Set(['minimal', 'low', 'medium', 'high', 'xhigh']);
 const CODEX_NATIVE_PASSTHROUGH_FLAGS = new Set(['--help', '-h', '--version', '-v']);
 
@@ -147,10 +147,6 @@ function detectProfile(args: string[]): DetectedProfile {
     // First arg doesn't start with '-' → treat as profile name
     return { profile: args[0], remainingArgs: args.slice(1) };
   }
-}
-
-function shouldUseCursorCliproxyShortcut(args: string[]): boolean {
-  return args[0] === 'cursor' && CURSOR_CLIPROXY_SHORTCUT_FLAGS.has(args[1] || '');
 }
 
 function resolveRuntimeReasoningFlags(
@@ -487,6 +483,18 @@ async function main(): Promise<void> {
   }
 
   if (await tryHandleRootCommand(args)) {
+    return;
+  }
+
+  if (
+    typeof firstArg === 'string' &&
+    isCLIProxyProvider(firstArg) &&
+    firstArg !== 'cursor' &&
+    args.length > 1 &&
+    (args.includes('--help') || args.includes('-h'))
+  ) {
+    const { showProviderShortcutHelp } = await import('./commands/help-command');
+    await showProviderShortcutHelp(firstArg);
     return;
   }
 
