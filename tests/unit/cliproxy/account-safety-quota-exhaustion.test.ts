@@ -253,7 +253,7 @@ describe('Quota Exhaustion Handlers', () => {
       expect(result.reason).toContain('no alternatives');
     });
 
-    it('should switch Claude accounts when fallback quota is unavailable but auth is valid', async () => {
+    it('should switch Claude accounts when fallback quota endpoint returns 404', async () => {
       writeRegistry({
         claude: {
           default: 'exhausted@example.com',
@@ -294,16 +294,7 @@ describe('Quota Exhaustion Handlers', () => {
       global.fetch = mock((_url: string, options?: RequestInit) => {
         const authHeader = new Headers(options?.headers).get('Authorization') ?? '';
         if (authHeader === 'Bearer fallback-token') {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({
-                error: {
-                  message: 'OAuth authentication is currently not supported.',
-                },
-              }),
-              { status: 401, headers: { 'Content-Type': 'application/json' } }
-            )
-          );
+          return Promise.resolve(new Response('', { status: 404 }));
         }
 
         return Promise.resolve(new Response('', { status: 500 }));
