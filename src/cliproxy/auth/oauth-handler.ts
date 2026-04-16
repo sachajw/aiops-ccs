@@ -428,7 +428,7 @@ async function prepareBinary(
   showStep(1, 4, 'progress', 'Preparing CLIProxy binary...');
 
   try {
-    const binaryPath = await ensureCLIProxyBinary(verbose);
+    const binaryPath = await ensureCLIProxyBinary(verbose, { skipAutoUpdate: true });
     process.stdout.write('\x1b[1A\x1b[2K');
     showStep(1, 4, 'ok', 'CLIProxy binary ready');
 

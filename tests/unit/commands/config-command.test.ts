@@ -171,6 +171,26 @@ describe('config command dashboard startup', () => {
     expect(errorLines).toHaveLength(0);
   });
 
+  it('still opens the dashboard when CLIProxy is unavailable', async () => {
+    await handleConfigCommand([], {
+      ...createTestDeps(),
+      ensureCliproxyService: async () => ({
+        started: false,
+        alreadyRunning: false,
+        port: 8317,
+        error:
+          'Failed to prepare binary: CLIProxy Plus binary is not installed locally. Run "ccs cliproxy install" when you have network access.',
+      }),
+    });
+
+    expect(startServerCalls).toHaveLength(1);
+    const rendered = logLines.join('\n');
+    expect(rendered).toContain(
+      'CLIProxy not available: Failed to prepare binary: CLIProxy Plus binary is not installed locally. Run "ccs cliproxy install" when you have network access.'
+    );
+    expect(rendered).toContain('Dashboard will work but Control Panel/Stats may be limited');
+  });
+
   it('fails cleanly when the server cannot bind the requested host', async () => {
     startServerError = new Error(
       'Unable to bind 192.0.2.123:4100; the address may be unavailable or the port may already be in use'

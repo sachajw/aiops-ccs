@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -14,6 +14,8 @@ describe('version-checker stale cache fallback', () => {
   });
 
   afterEach(() => {
+    mock.restore();
+
     if (originalCcsHome !== undefined) {
       process.env.CCS_HOME = originalCcsHome;
     } else {
@@ -85,5 +87,51 @@ describe('version-checker stale cache fallback', () => {
     expect(result.latestStable).toBe('6.9.23-0');
     expect(result.latest).toBe('6.9.23-0');
     expect(result.fromCache).toBe(true);
+  });
+
+  it('skips update lookups when runtime startup prefers the installed binary', async () => {
+    const { getExecutableName } = await import('../../../src/cliproxy/platform-detector');
+    const plusBinDir = path.join(tempHome, '.ccs', 'cliproxy', 'bin', 'plus');
+    fs.mkdirSync(plusBinDir, { recursive: true });
+    fs.writeFileSync(path.join(plusBinDir, getExecutableName('plus')), 'binary');
+
+    let checkForUpdatesCalls = 0;
+
+    mock.module('../../../src/cliproxy/binary/version-checker', () => ({
+      checkForUpdates: async () => {
+        checkForUpdatesCalls += 1;
+        return {
+          hasUpdate: false,
+          currentVersion: '6.8.2-0',
+          latestVersion: '6.8.2-0',
+          fromCache: false,
+          checkedAt: Date.now(),
+        };
+      },
+      fetchLatestVersion: async () => {
+        throw new Error('fetchLatestVersion should not run when skipAutoUpdate is enabled');
+      },
+      isNewerVersion: () => false,
+      isVersionFaulty: () => false,
+    }));
+
+    const { ensureBinary } = await import(
+      `../../../src/cliproxy/binary/lifecycle?skip-auto-update=${Date.now()}`
+    );
+
+    const binaryPath = await ensureBinary({
+      version: '6.8.2-0',
+      releaseUrl: 'https://example.com/releases/download',
+      binPath: plusBinDir,
+      maxRetries: 1,
+      verbose: false,
+      forceVersion: false,
+      skipAutoUpdate: true,
+      allowInstall: true,
+      backend: 'plus',
+    });
+
+    expect(binaryPath).toBe(path.join(plusBinDir, getExecutableName('plus')));
+    expect(checkForUpdatesCalls).toBe(0);
   });
 });

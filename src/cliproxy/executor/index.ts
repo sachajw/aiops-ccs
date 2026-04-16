@@ -329,7 +329,7 @@ export async function execClaudeWithCLIProxy(
     spinner.start();
 
     try {
-      binaryPath = await ensureCLIProxyBinary(verbose);
+      binaryPath = await ensureCLIProxyBinary(verbose, { skipAutoUpdate: true });
       spinner.succeed('CLIProxy binary ready');
     } catch (error) {
       spinner.fail('Failed to prepare CLIProxy');

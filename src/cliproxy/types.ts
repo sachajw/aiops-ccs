@@ -50,6 +50,10 @@ export interface BinaryManagerConfig {
   verbose: boolean;
   /** Force specific version (skip auto-upgrade to latest) */
   forceVersion: boolean;
+  /** Skip background update checks on runtime bootstrap paths */
+  skipAutoUpdate: boolean;
+  /** Allow downloading/installing the binary when it is missing */
+  allowInstall: boolean;
   /** Backend variant (original vs plus) */
   backend?: CLIProxyBackend;
 }

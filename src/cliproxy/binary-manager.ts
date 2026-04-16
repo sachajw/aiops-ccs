@@ -62,6 +62,8 @@ function createDefaultConfig(backend: CLIProxyBackend = DEFAULT_BACKEND): Binary
     maxRetries: 3,
     verbose: false,
     forceVersion: false,
+    skipAutoUpdate: false,
+    allowInstall: true,
     backend, // Pass backend for installer to use correct download URL
   };
 }
@@ -115,8 +117,16 @@ export class BinaryManager {
   }
 }
 
+export interface EnsureCLIProxyBinaryOptions {
+  allowInstall?: boolean;
+  skipAutoUpdate?: boolean;
+}
+
 /** Convenience function respecting version pin */
-export async function ensureCLIProxyBinary(verbose = false): Promise<string> {
+export async function ensureCLIProxyBinary(
+  verbose = false,
+  options: EnsureCLIProxyBinaryOptions = {}
+): Promise<string> {
   const backend = getConfiguredBackend();
 
   // Migrate old shared pin to backend-specific location (one-time migration)
@@ -130,11 +140,20 @@ export async function ensureCLIProxyBinary(verbose = false): Promise<string> {
         version: pinnedVersion,
         verbose,
         forceVersion: true,
+        skipAutoUpdate: options.skipAutoUpdate ?? false,
+        allowInstall: options.allowInstall ?? true,
       },
       backend
     ).ensureBinary();
   }
-  return new BinaryManager({ verbose }, backend).ensureBinary();
+  return new BinaryManager(
+    {
+      verbose,
+      skipAutoUpdate: options.skipAutoUpdate ?? false,
+      allowInstall: options.allowInstall ?? true,
+    },
+    backend
+  ).ensureBinary();
 }
 
 /** Check if CLIProxyAPI binary is installed */

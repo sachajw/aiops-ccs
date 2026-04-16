@@ -1,4 +1,28 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
+let originalCcsHome: string | undefined;
+let tempHome = '';
+
+beforeEach(() => {
+  originalCcsHome = process.env.CCS_HOME;
+  tempHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-binary-manager-'));
+  process.env.CCS_HOME = tempHome;
+});
+
+afterEach(() => {
+  if (originalCcsHome !== undefined) {
+    process.env.CCS_HOME = originalCcsHome;
+  } else {
+    delete process.env.CCS_HOME;
+  }
+
+  if (tempHome && fs.existsSync(tempHome)) {
+    fs.rmSync(tempHome, { recursive: true, force: true });
+  }
+});
 
 describe('installCliproxyVersion', () => {
   it('attempts to stop the proxy even when there is no tracked running session', async () => {
@@ -41,5 +65,20 @@ describe('installCliproxyVersion', () => {
     expect(calls.waitForPortFree).toBe(0);
     expect(calls.deleteBinary).toBe(0);
     expect(calls.ensureBinary).toBe(1);
+  });
+
+  it('fails fast when runtime startup forbids installing a missing binary', async () => {
+    const binaryManager = await import(
+      `../../../src/cliproxy/binary-manager?binary-manager-runtime=${Date.now()}`
+    );
+
+    await expect(
+      binaryManager.ensureCLIProxyBinary(false, {
+        allowInstall: false,
+        skipAutoUpdate: true,
+      })
+    ).rejects.toThrow(
+      'CLIProxy Plus binary is not installed locally. Run "ccs cliproxy install" when you have network access.'
+    );
   });
 });
