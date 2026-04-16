@@ -152,6 +152,49 @@ describe('browser routes', () => {
     });
   });
 
+  it('treats a blank user-data directory as a reset to the recommended path', async () => {
+    const firstResponse = await fetch(`${baseUrl}/api/browser`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        claude: {
+          enabled: true,
+          userDataDir: '/tmp/ccs-browser-custom',
+          devtoolsPort: 9333,
+        },
+      }),
+    });
+
+    expect(firstResponse.status).toBe(200);
+
+    const resetResponse = await fetch(`${baseUrl}/api/browser`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        claude: {
+          userDataDir: '   ',
+        },
+      }),
+    });
+
+    expect(resetResponse.status).toBe(200);
+    const payload = await resetResponse.json();
+    expect(payload.browser.config.claude).toMatchObject({
+      enabled: true,
+      userDataDir: join(tempHome, '.ccs', 'browser', 'chrome-user-data'),
+      devtoolsPort: 9333,
+    });
+
+    const config = loadOrCreateUnifiedConfig();
+    expect(config.browser).toMatchObject({
+      claude: {
+        enabled: true,
+        user_data_dir: join(tempHome, '.ccs', 'browser', 'chrome-user-data'),
+        devtools_port: 9333,
+      },
+    });
+  });
+
   it('rejects invalid DevTools ports at the route boundary', async () => {
     const response = await fetch(`${baseUrl}/api/browser`, {
       method: 'PUT',

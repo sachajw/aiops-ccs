@@ -93,11 +93,13 @@ router.put('/', async (req: Request, res: Response): Promise<void> => {
 
   try {
     const current = getBrowserConfig();
+    const nextClaudeUserDataDir =
+      claude?.userDataDir === undefined ? current.claude.user_data_dir : claude.userDataDir.trim();
     mutateUnifiedConfig((config) => {
       config.browser = {
         claude: {
           enabled: claude?.enabled ?? current.claude.enabled,
-          user_data_dir: claude?.userDataDir?.trim() || current.claude.user_data_dir,
+          user_data_dir: nextClaudeUserDataDir,
           devtools_port: claude?.devtoolsPort ?? current.claude.devtools_port,
         },
         codex: {
