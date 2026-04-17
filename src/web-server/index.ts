@@ -12,8 +12,12 @@ import path from 'path';
 import { WebSocketServer } from 'ws';
 import { setupWebSocket } from './websocket';
 import { createSessionMiddleware, authMiddleware } from './middleware/auth-middleware';
+import { requestLoggingMiddleware } from './middleware/request-logging-middleware';
+import { ensureManagedModelPrefixes } from '../cliproxy/managed-model-prefixes';
+import { getProxyTarget } from '../cliproxy/proxy-target-resolver';
 import { startAutoSyncWatcher, stopAutoSyncWatcher } from '../cliproxy/sync';
 import { shutdownUsageAggregator } from './usage/aggregator';
+import { createLogger } from '../services/logging';
 
 export interface ServerOptions {
   port: number;
@@ -28,6 +32,8 @@ export interface ServerInstance {
   cleanup: () => void;
 }
 
+const logger = createLogger('web-server');
+
 /**
  * Start Express server with WebSocket support
  */
@@ -36,6 +42,7 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   const server = http.createServer(app);
   const wss = new WebSocketServer({
     server,
+    path: '/ws',
     maxPayload: 1024 * 1024, // 1MB hard limit to prevent DoS
     perMessageDeflate: false, // Prevent zip bomb attacks
   });
@@ -56,12 +63,17 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
       next(err);
     }
   );
+  app.use(requestLoggingMiddleware);
 
   // Session middleware (for dashboard auth)
   app.use(createSessionMiddleware());
 
   // Auth middleware (protects API routes when enabled)
   app.use(authMiddleware);
+
+  // CLIProxy local reverse proxy (avoids cross-origin issues in Docker)
+  const cliproxyLocalProxy = (await import('./routes/cliproxy-local-proxy')).default;
+  app.use('/api/cliproxy-local', cliproxyLocalProxy);
 
   // REST API routes (modularized)
   const { apiRoutes } = await import('./routes/index');
@@ -84,7 +96,11 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       root: path.join(__dirname, '../../ui'),
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // Reuse the dashboard HTTP server for HMR in middleware mode.
+        hmr: { server },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -105,6 +121,14 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   // Start auto-sync watcher (if enabled in config)
   startAutoSyncWatcher();
 
+  if (!getProxyTarget().isRemote) {
+    void ensureManagedModelPrefixes().catch((error) => {
+      logger.warn('cliproxy.prefix_sync_failed', 'Managed model prefix repair failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  }
+
   // Combined cleanup function
   const cleanup = () => {
     wsCleanup();
@@ -115,6 +139,12 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   // Start listening
   return new Promise<ServerInstance>((resolve, reject) => {
     const onError = (error: NodeJS.ErrnoException) => {
+      logger.error('server.listen_failed', 'Dashboard server failed to start', {
+        code: error.code || 'unknown',
+        message: error.message,
+        host: options.host || null,
+        port: options.port,
+      });
       cleanup();
       reject(new Error(formatListenError(error, options)));
     };
@@ -123,6 +153,11 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
 
     const onListening = () => {
       server.off('error', onError);
+      logger.info('server.listening', 'Dashboard server listening', {
+        host: options.host || '0.0.0.0',
+        port: options.port,
+        dev: Boolean(options.dev),
+      });
       // Usage cache loads on-demand when Analytics page is visited
       // This keeps server startup instant for users who don't need analytics
       resolve({ server, wss, cleanup });

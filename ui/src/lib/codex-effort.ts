@@ -10,12 +10,16 @@ export function parseCodexEffort(modelId: string | undefined): CodexEffort | und
 }
 
 export function getCodexEffortDisplay(
-  modelId: string | undefined
+  modelId: string | undefined,
+  effortLabels?: { pinned: (effort: string) => string; auto: string }
 ): { label: string; explicit: boolean } | null {
   if (!modelId) return null;
   const effort = parseCodexEffort(modelId);
   if (effort) {
-    return { label: `Pinned ${effort}`, explicit: true };
+    return {
+      label: effortLabels?.pinned(effort) ?? `Pinned ${effort}`,
+      explicit: true,
+    };
   }
-  return { label: 'Auto effort', explicit: false };
+  return { label: effortLabels?.auto ?? 'Auto effort', explicit: false };
 }

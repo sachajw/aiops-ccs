@@ -1,6 +1,6 @@
 # Provider Integration Flows
 
-Last Updated: 2026-02-16
+Last Updated: 2026-03-30
 
 Detailed provider integration flows including CLIProxyAPI, legacy GLMT compatibility transforms, remote CLIProxy, quota management, and authentication.
 
@@ -75,6 +75,18 @@ CLIProxyAPI is a local OAuth proxy binary that enables seamless integration with
 | Antigravity | `agy` | Authorization Code | 9876 | CLIProxyAPI |
 | Kiro (AWS) | `kiro` | Method-aware (default: Device Code) | 9876 | CLIProxyAPIPlus |
 | GitHub Copilot | `ghcp` | Device Code | none | CLIProxyAPIPlus |
+
+### Codex Duplicate-Email Account Identity
+
+Codex can legitimately produce multiple auth files for the same email when the user has both a team/business login and a personal/free login. CCS now treats those as separate accounts instead of collapsing them by email.
+
+- Internal account IDs stay duplicate-aware for Codex only: `email#variant`
+- Variant keys are derived from the auth filename, for example `kaidu.kd@gmail.com#04a0f049-team` and `kaidu.kd@gmail.com#free`
+- Dashboard surfaces continue to show the canonical email, with a compact variant badge such as `Team` or `Free`
+- Quota fetch resolves the exact registry `tokenFile` for the selected account instead of scanning by email and taking the first match
+- Live usage/account monitor stats key by `provider + account identity`, so duplicate Codex emails no longer merge into one runtime bucket
+
+This preserves the user-visible distinction between business and personal Codex sessions while keeping other providers on their existing email-backed identity model.
 
 ### Hardcoded Provider Detection
 
@@ -326,7 +338,7 @@ function selectBestAccount(accounts: AccountInfo[]): AccountInfo | null {
 |              OAuth - Authorization Code Flow (Port-based)                 |
 +===========================================================================+
 
-  1. User runs: ccs gemini
+  1. User runs: ccs codex
         |
         v
   2. Check token cache (~/.ccs/cliproxy/auth/)
@@ -525,29 +537,29 @@ Image Analysis Hook enables vision model proxying through CLIProxy with automati
   Claude CLI processes image request
         |
         v
-  Hook intercepts image request
+  Claude prefers ImageAnalysis MCP tool
         |
         v
-  Vision Model Proxying (via CLIProxyAPI)
+  CCS provider-backed image analysis
         |
-        +---> Gemini, Codex, AGY support vision
+        +---> Provider route resolved before launch
         |
-        +---> Kiro (Claude native vision)
+        +---> Direct request to /api/provider/<backend>/v1/messages
         |
-        +---> Skip for Claude Sub accounts (native vision)
+        +---> Native Read fallback if runtime/auth/proxy is unavailable
         |
         v
-  Vision response returned to Claude CLI
+  Text description returned to Claude CLI
 ```
 
-### Hook Environment
+### Runtime Environment
 
 ```typescript
 // getImageAnalysisHookEnv()
 {
-  ANTHROPIC_IMAGE_HOOK_URL: 'http://localhost:8317/api/image-analysis',
-  // or for remote proxy:
-  ANTHROPIC_IMAGE_HOOK_URL: 'https://proxy.example.com:8317/api/image-analysis',
+  CCS_IMAGE_ANALYSIS_RUNTIME_BASE_URL: 'http://127.0.0.1:8317',
+  CCS_IMAGE_ANALYSIS_RUNTIME_PATH: '/api/provider/agy',
+  CCS_IMAGE_ANALYSIS_RUNTIME_API_KEY: 'ccs-internal-managed',
 }
 ```
 
@@ -555,12 +567,12 @@ Image Analysis Hook enables vision model proxying through CLIProxy with automati
 
 | Provider | Vision Support | Notes |
 |----------|---|---|
-| Gemini | ✓ | Via CLIProxy image analysis |
-| Codex | ✓ | Via CLIProxy image analysis |
-| Antigravity | ✓ | Via CLIProxy image analysis |
-| Kiro | ✓ | Native Claude vision (no proxy needed) |
-| Copilot | ✗ | Not supported |
-| GLM/Kimi | ✗ | Requires direct API implementation |
+| Gemini | ✓ | Via CCS ImageAnalysis provider route |
+| Codex | ✓ | Via CCS ImageAnalysis provider route |
+| Antigravity | ✓ | Via CCS ImageAnalysis provider route |
+| Kiro | ✓ | Via mapped CCS provider route when configured |
+| Copilot | ✓ | Via mapped ghcp provider route |
+| GLM/Kimi | ✓ | Via explicit or fallback backend mapping |
 
 ---
 

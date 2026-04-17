@@ -6,6 +6,11 @@ import * as path from 'path';
 import * as http from 'http';
 import type { Server } from 'http';
 import cliproxyAuthRoutes from '../../../src/web-server/routes/cliproxy-auth-routes';
+import {
+  clearQuotaCache,
+  getCachedQuota,
+  setCachedQuota,
+} from '../../../src/cliproxy/quota-response-cache';
 import { restoreFetch, mockFetch } from '../../mocks';
 
 describe('cliproxy-auth-routes manual callback nickname persistence', () => {
@@ -49,6 +54,7 @@ describe('cliproxy-auth-routes manual callback nickname persistence', () => {
 
   afterEach(() => {
     restoreFetch();
+    clearQuotaCache();
 
     if (originalCcsHome === undefined) {
       delete process.env.CCS_HOME;
@@ -173,13 +179,13 @@ describe('cliproxy-auth-routes manual callback nickname persistence', () => {
     expect(registry.providers.kiro.accounts['github-ABC123']?.nickname).toBe('work');
   });
 
-  it('returns 409 when callback completes upstream but no account can be registered locally', async () => {
+  it('returns wait after callback submission when the local token is not yet available', async () => {
     mockFetch([
       {
-        url: /\/v0\/management\/kiro-auth-url\?is_webui=true&method=google$/,
+        url: /\/v0\/management\/codex-auth-url\?is_webui=true$/,
         response: {
-          auth_url: 'https://auth.example.com/authorize?state=state-409',
-          state: 'state-409',
+          auth_url: 'https://auth.example.com/authorize?state=state-callback-wait',
+          state: 'state-callback-wait',
         },
       },
       {
@@ -187,26 +193,44 @@ describe('cliproxy-auth-routes manual callback nickname persistence', () => {
         method: 'POST',
         response: { status: 'ok' },
       },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-callback-wait$/,
+        response: { status: 'ok' },
+      },
     ]);
 
-    const startResponse = await postJson('/api/cliproxy/auth/kiro/start-url', {
-      nickname: 'work',
-      kiroMethod: 'google',
-    });
+    const startResponse = await postJson('/api/cliproxy/auth/codex/start-url', {});
     expect(startResponse.status).toBe(200);
 
-    const callbackResponse = await postJson('/api/cliproxy/auth/kiro/submit-callback', {
-      redirectUrl: 'http://localhost/callback?code=abc123&state=state-409',
-    });
+    const realDateNow = Date.now;
+    let now = realDateNow();
+    Date.now = () => now;
+    try {
+      const callbackResponse = await postJson('/api/cliproxy/auth/codex/submit-callback', {
+        redirectUrl: 'http://localhost/callback?code=abc123&state=state-callback-wait',
+      });
 
-    expect(callbackResponse.status).toBe(409);
-    expect(callbackResponse.body).toEqual({
-      error:
-        'Authenticated token could not be matched to a new account. Retry the flow and choose a different nickname if needed.',
-    });
+      expect(callbackResponse.status).toBe(200);
+      expect(callbackResponse.body).toEqual({ status: 'wait' });
+
+      now += 16_000;
+
+      const statusResponse = await getJson(
+        '/api/cliproxy/auth/codex/status?state=state-callback-wait'
+      );
+
+      expect(statusResponse.status).toBe(409);
+      expect(statusResponse.body).toEqual({
+        status: 'error',
+        error:
+          'Authentication completed upstream, but no new local token was saved for this account. Update CCS/CLIProxy and retry.',
+      });
+    } finally {
+      Date.now = realDateNow;
+    }
   });
 
-  it('returns 409 when status polling completes upstream but no new local token was written', async () => {
+  it('keeps polling briefly after upstream completion before surfacing the missing-token error', async () => {
     const tokenDir = path.join(tempHome, '.ccs', 'cliproxy', 'auth');
     fs.mkdirSync(tokenDir, { recursive: true });
     fs.writeFileSync(
@@ -232,16 +256,267 @@ describe('cliproxy-auth-routes manual callback nickname persistence', () => {
     const startResponse = await postJson('/api/cliproxy/auth/codex/start-url', {});
     expect(startResponse.status).toBe(200);
 
-    const statusResponse = await getJson(
-      '/api/cliproxy/auth/codex/status?state=state-status-missing'
+    const realDateNow = Date.now;
+    let now = realDateNow();
+    Date.now = () => now;
+    try {
+      const firstStatusResponse = await getJson(
+        '/api/cliproxy/auth/codex/status?state=state-status-missing'
+      );
+
+      expect(firstStatusResponse.status).toBe(200);
+      expect(firstStatusResponse.body).toEqual({ status: 'wait' });
+
+      now += 16_000;
+
+      const secondStatusResponse = await getJson(
+        '/api/cliproxy/auth/codex/status?state=state-status-missing'
+      );
+
+      expect(secondStatusResponse.status).toBe(409);
+      expect(secondStatusResponse.body).toEqual({
+        status: 'error',
+        error:
+          'Authentication completed upstream, but no new local token was saved for this account. Update CCS/CLIProxy and retry.',
+      });
+    } finally {
+      Date.now = realDateNow;
+    }
+  });
+
+  it('continues polling until the local token appears after upstream completion', async () => {
+    mockFetch([
+      {
+        url: /\/v0\/management\/codex-auth-url\?is_webui=true$/,
+        response: {
+          auth_url: 'https://auth.example.com/authorize?state=state-status-delayed',
+          state: 'state-status-delayed',
+        },
+      },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-status-delayed$/,
+        response: { status: 'ok' },
+      },
+    ]);
+
+    const startResponse = await postJson('/api/cliproxy/auth/codex/start-url', {});
+    expect(startResponse.status).toBe(200);
+
+    const firstStatusResponse = await getJson(
+      '/api/cliproxy/auth/codex/status?state=state-status-delayed'
     );
 
-    expect(statusResponse.status).toBe(409);
-    expect(statusResponse.body).toEqual({
-      status: 'error',
-      error:
-        'Authentication completed upstream, but no new local token was saved for this account. Update CCS/CLIProxy and retry.',
+    expect(firstStatusResponse.status).toBe(200);
+    expect(firstStatusResponse.body).toEqual({ status: 'wait' });
+
+    const tokenDir = path.join(tempHome, '.ccs', 'cliproxy', 'auth');
+    fs.mkdirSync(tokenDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(tokenDir, 'codex-delayed@example.com.json'),
+      JSON.stringify({ type: 'codex', email: 'delayed@example.com' }),
+      'utf8'
+    );
+
+    const secondStatusResponse = await getJson(
+      '/api/cliproxy/auth/codex/status?state=state-status-delayed'
+    );
+
+    expect(secondStatusResponse.status).toBe(200);
+    expect(secondStatusResponse.body).toEqual({
+      status: 'ok',
+      account: {
+        id: 'delayed@example.com',
+        email: 'delayed@example.com',
+        nickname: 'delayed',
+        provider: 'codex',
+        isDefault: true,
+      },
     });
+  });
+
+  it('lets polling finish successfully after callback submission once the token appears', async () => {
+    mockFetch([
+      {
+        url: /\/v0\/management\/codex-auth-url\?is_webui=true$/,
+        response: {
+          auth_url: 'https://auth.example.com/authorize?state=state-callback-delayed',
+          state: 'state-callback-delayed',
+        },
+      },
+      {
+        url: /\/v0\/management\/oauth-callback$/,
+        method: 'POST',
+        response: { status: 'ok' },
+      },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-callback-delayed$/,
+        response: { status: 'ok' },
+      },
+    ]);
+
+    const startResponse = await postJson('/api/cliproxy/auth/codex/start-url', {});
+    expect(startResponse.status).toBe(200);
+
+    const callbackResponse = await postJson('/api/cliproxy/auth/codex/submit-callback', {
+      redirectUrl: 'http://localhost/callback?code=abc123&state=state-callback-delayed',
+    });
+
+    expect(callbackResponse.status).toBe(200);
+    expect(callbackResponse.body).toEqual({ status: 'wait' });
+
+    const tokenDir = path.join(tempHome, '.ccs', 'cliproxy', 'auth');
+    fs.mkdirSync(tokenDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(tokenDir, 'codex-callback@example.com.json'),
+      JSON.stringify({ type: 'codex', email: 'callback@example.com' }),
+      'utf8'
+    );
+
+    const statusResponse = await getJson(
+      '/api/cliproxy/auth/codex/status?state=state-callback-delayed'
+    );
+
+    expect(statusResponse.status).toBe(200);
+    expect(statusResponse.body).toEqual({
+      status: 'ok',
+      account: {
+        id: 'callback@example.com',
+        email: 'callback@example.com',
+        nickname: 'callback',
+        provider: 'codex',
+        isDefault: true,
+      },
+    });
+  });
+
+  it('keeps the pending auth state alive through the local-token grace window even near TTL expiry', async () => {
+    mockFetch([
+      {
+        url: /\/v0\/management\/codex-auth-url\?is_webui=true$/,
+        response: {
+          auth_url: 'https://auth.example.com/authorize?state=state-ttl-grace',
+          state: 'state-ttl-grace',
+        },
+      },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-ttl-grace$/,
+        response: { status: 'ok' },
+      },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-ttl-grace$/,
+        response: { status: 'ok' },
+      },
+    ]);
+
+    const realDateNow = Date.now;
+    let now = realDateNow();
+    Date.now = () => now;
+    try {
+      const startResponse = await postJson('/api/cliproxy/auth/codex/start-url', {});
+      expect(startResponse.status).toBe(200);
+
+      now += 10 * 60 * 1000 - 1_000;
+
+      const firstStatusResponse = await getJson(
+        '/api/cliproxy/auth/codex/status?state=state-ttl-grace'
+      );
+
+      expect(firstStatusResponse.status).toBe(200);
+      expect(firstStatusResponse.body).toEqual({ status: 'wait' });
+
+      const tokenDir = path.join(tempHome, '.ccs', 'cliproxy', 'auth');
+      fs.mkdirSync(tokenDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(tokenDir, 'codex-ttl@example.com.json'),
+        JSON.stringify({ type: 'codex', email: 'ttl@example.com' }),
+        'utf8'
+      );
+
+      now += 2_000;
+
+      const secondStatusResponse = await getJson(
+        '/api/cliproxy/auth/codex/status?state=state-ttl-grace'
+      );
+
+      expect(secondStatusResponse.status).toBe(200);
+      expect(secondStatusResponse.body).toEqual({
+        status: 'ok',
+        account: {
+          id: 'ttl@example.com',
+          email: 'ttl@example.com',
+          nickname: 'ttl',
+          provider: 'codex',
+          isDefault: true,
+        },
+      });
+    } finally {
+      Date.now = realDateNow;
+    }
+  });
+
+  it('does not treat rewrites of pre-existing token files as a newly added account', async () => {
+    const tokenDir = path.join(tempHome, '.ccs', 'cliproxy', 'auth');
+    fs.mkdirSync(tokenDir, { recursive: true });
+    const tokenPath = path.join(tokenDir, 'codex-existing@example.com.json');
+    fs.writeFileSync(
+      tokenPath,
+      JSON.stringify({ type: 'codex', email: 'existing@example.com', version: 1 }),
+      'utf8'
+    );
+
+    mockFetch([
+      {
+        url: /\/v0\/management\/codex-auth-url\?is_webui=true$/,
+        response: {
+          auth_url: 'https://auth.example.com/authorize?state=state-existing-rewrite',
+          state: 'state-existing-rewrite',
+        },
+      },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-existing-rewrite$/,
+        response: { status: 'ok' },
+      },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-existing-rewrite$/,
+        response: { status: 'ok' },
+      },
+    ]);
+
+    const startResponse = await postJson('/api/cliproxy/auth/codex/start-url', {});
+    expect(startResponse.status).toBe(200);
+
+    fs.writeFileSync(
+      tokenPath,
+      JSON.stringify({ type: 'codex', email: 'existing@example.com', version: 2 }),
+      'utf8'
+    );
+
+    const realDateNow = Date.now;
+    let now = realDateNow();
+    Date.now = () => now;
+    try {
+      const firstStatusResponse = await getJson(
+        '/api/cliproxy/auth/codex/status?state=state-existing-rewrite'
+      );
+
+      expect(firstStatusResponse.status).toBe(200);
+      expect(firstStatusResponse.body).toEqual({ status: 'wait' });
+
+      now += 16_000;
+
+      const secondStatusResponse = await getJson(
+        '/api/cliproxy/auth/codex/status?state=state-existing-rewrite'
+      );
+
+      expect(secondStatusResponse.status).toBe(409);
+      expect(secondStatusResponse.body).toEqual({
+        status: 'error',
+        error:
+          'Authentication completed upstream, but no new local token was saved for this account. Update CCS/CLIProxy and retry.',
+      });
+    } finally {
+      Date.now = realDateNow;
+    }
   });
 
   it('registers the new account before reporting polled auth success', async () => {
@@ -294,5 +569,63 @@ describe('cliproxy-auth-routes manual callback nickname persistence', () => {
     };
 
     expect(registry.providers.codex.accounts['new@example.com']?.email).toBe('new@example.com');
+  });
+
+  it('clears stale Claude quota cache after polling auth success', async () => {
+    mockFetch([
+      {
+        url: /\/v0\/management\/anthropic-auth-url\?is_webui=true$/,
+        response: {
+          auth_url: 'https://auth.example.com/authorize?state=state-claude-cache-clear',
+          state: 'state-claude-cache-clear',
+        },
+      },
+      {
+        url: /\/v0\/management\/get-auth-status\?state=state-claude-cache-clear$/,
+        response: { status: 'ok' },
+      },
+    ]);
+
+    const startResponse = await postJson('/api/cliproxy/auth/claude/start-url', {});
+    expect(startResponse.status).toBe(200);
+
+    const accountId = 'claude-team@example.com';
+    setCachedQuota('claude', accountId, {
+      success: false,
+      error: 'Authentication required for policy limits',
+      needsReauth: true,
+    });
+    expect(getCachedQuota('claude', accountId)).not.toBeNull();
+
+    const tokenDir = path.join(tempHome, '.ccs', 'cliproxy', 'auth');
+    fs.mkdirSync(tokenDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(tokenDir, 'claude-claude-team@example.com.json'),
+      JSON.stringify({
+        type: 'claude',
+        email: accountId,
+        access_token: 'fresh-token',
+        refresh_token: 'refresh-token',
+        expired: '2099-01-01T00:00:00.000Z',
+      }),
+      'utf8'
+    );
+
+    const statusResponse = await getJson(
+      '/api/cliproxy/auth/claude/status?state=state-claude-cache-clear'
+    );
+
+    expect(statusResponse.status).toBe(200);
+    expect(statusResponse.body).toEqual({
+      status: 'ok',
+      account: {
+        id: accountId,
+        email: accountId,
+        nickname: 'claude-team',
+        provider: 'claude',
+        isDefault: true,
+      },
+    });
+    expect(getCachedQuota('claude', accountId)).toBeNull();
   });
 });

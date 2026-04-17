@@ -1,5 +1,6 @@
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -33,6 +34,7 @@ export interface ProviderCardProps {
   docsUrl?: string;
   installCommand?: string;
   footerNote?: string;
+  children?: ReactNode;
 }
 
 const PROVIDER_TONE_STYLES = {
@@ -113,7 +115,9 @@ export function ProviderCard({
   docsUrl,
   installCommand,
   footerNote,
+  children,
 }: ProviderCardProps) {
+  const { t } = useTranslation();
   const tone = PROVIDER_TONE_STYLES[badgeTone];
   const status = getStatusToneStyles(statusTone);
 
@@ -193,7 +197,7 @@ export function ProviderCard({
                   </Label>
                   {field.saved && (
                     <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                      Saved
+                      {t('settings.saved')}
                     </span>
                   )}
                 </div>
@@ -217,6 +221,12 @@ export function ProviderCard({
         </div>
       )}
 
+      {enabled && children && (
+        <div className="relative mt-4 rounded-xl border border-border/65 bg-background/70 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] backdrop-blur-sm">
+          {children}
+        </div>
+      )}
+
       {(footerNote || installCommand || docsUrl) && (
         <div className="relative mt-4 space-y-2 rounded-xl border border-border/65 bg-muted/30 p-3">
           {footerNote && <p className="text-xs text-muted-foreground">{footerNote}</p>}
@@ -233,7 +243,7 @@ export function ProviderCard({
               className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
             >
               <ExternalLink className="h-3 w-3" />
-              View docs
+              {t('settingsWebsearch.viewDocs')}
             </a>
           )}
         </div>

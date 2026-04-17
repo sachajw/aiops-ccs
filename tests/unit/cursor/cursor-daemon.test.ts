@@ -2,7 +2,7 @@
  * Unit tests for Cursor daemon module
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -19,7 +19,12 @@ import {
 } from '../../../src/cursor/cursor-daemon';
 import { getCcsDir } from '../../../src/utils/config-manager';
 import { handleCursorCommand } from '../../../src/commands/cursor-command';
+import {
+  renderCursorHelp,
+  renderCursorStatus,
+} from '../../../src/commands/cursor-command-display';
 import { loadCredentials } from '../../../src/cursor/cursor-auth';
+import { DEFAULT_CURSOR_CONFIG } from '../../../src/config/unified-config-types';
 
 // Test isolation
 let originalCcsHome: string | undefined;
@@ -48,6 +53,27 @@ afterEach(() => {
 
 // Use getCcsDir() for consistent path resolution with production code
 const getTestCursorDir = () => path.join(getCcsDir(), 'cursor');
+
+async function waitForProcessReady(pid: number): Promise<void> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      process.kill(pid, 0);
+
+      if (process.platform !== 'linux') {
+        return;
+      }
+
+      const commandLine = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, '').trim();
+      if (commandLine.length > 0) {
+        return;
+      }
+    } catch {
+      // Process is still starting up.
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
 
 describe('getPidFromFile', () => {
   it('returns null when no PID file exists', () => {
@@ -230,6 +256,7 @@ describe('stopDaemon', () => {
       throw new Error('Failed to spawn unrelated process');
     }
 
+    await waitForProcessReady(unrelatedPid);
     writePidToFile(unrelatedPid);
 
     try {
@@ -246,9 +273,64 @@ describe('stopDaemon', () => {
       }
     }
   });
+
+  it('refuses to stop when daemon ownership cannot be verified', async () => {
+    const killSpy = spyOn(process, 'kill').mockImplementation(
+      ((pid: number, signal?: NodeJS.Signals | number) => {
+        if (pid === process.pid && signal === 0) {
+          const err = new Error('EPERM') as NodeJS.ErrnoException;
+          err.code = 'EPERM';
+          throw err;
+        }
+
+        return true;
+      }) as typeof process.kill
+    );
+
+    writePidToFile(process.pid);
+
+    try {
+      const result = await stopDaemon();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('unable to verify daemon ownership');
+      expect(fs.existsSync(path.join(getTestCursorDir(), 'daemon.pid'))).toBe(true);
+    } finally {
+      killSpy.mockRestore();
+      removePidFile();
+    }
+  });
 });
 
 describe('handleCursorCommand', () => {
+  it('shows help when invoked without an admin subcommand', async () => {
+    const originalLog = console.log;
+    const originalError = console.error;
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map((arg) => String(arg)).join(' '));
+    };
+    console.error = (...args: unknown[]) => {
+      errors.push(args.map((arg) => String(arg)).join(' '));
+    };
+
+    try {
+      const exitCode = await handleCursorCommand([]);
+
+      expect(exitCode).toBe(0);
+      expect(errors).toHaveLength(0);
+      expect(logs.some((line) => line.includes('Legacy Cursor Compatibility'))).toBe(true);
+      expect(logs.some((line) => line.includes('Usage: ccs legacy cursor <subcommand>'))).toBe(
+        true
+      );
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+  });
+
   it('returns exit code 1 for unknown subcommand', async () => {
     const exitCode = await handleCursorCommand(['nonexistent']);
     expect(exitCode).toBe(1);
@@ -273,5 +355,158 @@ describe('handleCursorCommand', () => {
     expect(credentials).not.toBeNull();
     expect(credentials?.authMethod).toBe('manual');
     expect(credentials?.machineId).toBe(machineId);
+  });
+});
+
+describe('renderCursorStatus', () => {
+  it('shows runtime endpoint guidance when Cursor is ready', () => {
+    const originalLog = console.log;
+    const logs: string[] = [];
+
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map((arg) => String(arg)).join(' '));
+    };
+
+    try {
+      renderCursorStatus(
+        { ...DEFAULT_CURSOR_CONFIG, enabled: true, port: 20129 },
+        {
+          authenticated: true,
+          expired: false,
+          tokenAge: 0,
+          credentials: {
+            accessToken: 'a'.repeat(60),
+            machineId: '1234567890abcdef1234567890abcdef',
+            authMethod: 'manual',
+            importedAt: new Date().toISOString(),
+          },
+        },
+        { running: true, port: 20129, pid: 1234 }
+      );
+
+      expect(logs.some((line) => line.includes('OpenAI base:     http://127.0.0.1:20129/v1'))).toBe(
+        true
+      );
+      expect(
+        logs.some((line) => line.includes('Chat route:      http://127.0.0.1:20129/v1/chat/completions'))
+      ).toBe(true);
+      expect(
+        logs.some((line) => line.includes('Anthropic base:  http://127.0.0.1:20129'))
+      ).toBe(true);
+      expect(
+        logs.some((line) => line.includes(`Raw settings:    ${getCcsDir()}/cursor.settings.json`))
+      ).toBe(true);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('shows runtime guidance even when setup is incomplete', () => {
+    const originalLog = console.log;
+    const logs: string[] = [];
+
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map((arg) => String(arg)).join(' '));
+    };
+
+    try {
+      renderCursorStatus(
+        { ...DEFAULT_CURSOR_CONFIG, enabled: false, port: 20129 },
+        {
+          authenticated: false,
+          expired: false,
+          tokenAge: undefined,
+          credentials: undefined,
+        },
+        { running: false, port: 20129, pid: undefined }
+      );
+
+      expect(logs.some((line) => line.includes('OpenAI base:     http://127.0.0.1:20129/v1'))).toBe(
+        true
+      );
+      expect(logs.some((line) => line.includes('Next steps:'))).toBe(true);
+      expect(logs.some((line) => line.includes('  - Help:        ccs legacy cursor help'))).toBe(
+        true
+      );
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it('falls back to ~/.ccs in status output when no CCS override is active', () => {
+    const originalLog = console.log;
+    const originalCcsHomeValue = process.env.CCS_HOME;
+    const logs: string[] = [];
+
+    delete process.env.CCS_HOME;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map((arg) => String(arg)).join(' '));
+    };
+
+    try {
+      renderCursorStatus(
+        { ...DEFAULT_CURSOR_CONFIG, enabled: true, port: 20129 },
+        {
+          authenticated: true,
+          expired: false,
+          tokenAge: 0,
+          credentials: {
+            accessToken: 'a'.repeat(60),
+            machineId: '1234567890abcdef1234567890abcdef',
+            authMethod: 'manual',
+            importedAt: new Date().toISOString(),
+          },
+        },
+        { running: true, port: 20129, pid: 1234 }
+      );
+
+      expect(logs.some((line) => line.includes('Raw settings:    ~/.ccs/cursor.settings.json'))).toBe(
+        true
+      );
+    } finally {
+      if (originalCcsHomeValue !== undefined) {
+        process.env.CCS_HOME = originalCcsHomeValue;
+      } else {
+        delete process.env.CCS_HOME;
+      }
+      console.log = originalLog;
+    }
+  });
+});
+
+describe('renderCursorHelp', () => {
+  it('marks the legacy Cursor surface deprecated while keeping compatibility guidance', () => {
+    const originalLog = console.log;
+    const logs: string[] = [];
+
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map((arg) => String(arg)).join(' '));
+    };
+
+    try {
+      const exitCode = renderCursorHelp();
+
+      expect(exitCode).toBe(0);
+      expect(logs.some((line) => line.includes('Usage: ccs legacy cursor <subcommand>'))).toBe(
+        true
+      );
+      expect(logs.some((line) => line.includes('Legacy Cursor Compatibility'))).toBe(true);
+      expect(
+        logs.some((line) =>
+          line.includes('Deprecated: `ccs cursor` now belongs to the CLIProxy Cursor provider.')
+        )
+      ).toBe(true);
+      expect(logs.some((line) => line.includes('probe     Run a live authenticated runtime probe'))).toBe(
+        true
+      );
+      expect(
+        logs.some((line) => line.includes('ccs cursor --auth'))
+      ).toBe(true);
+      expect(
+        logs.some((line) => line.includes('ccs legacy cursor [claude args]'))
+      ).toBe(true);
+    } finally {
+      console.log = originalLog;
+    }
   });
 });

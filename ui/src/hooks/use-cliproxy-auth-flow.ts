@@ -6,6 +6,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { api } from '@/lib/api-client';
 import { isValidProvider, isDeviceCodeProvider } from '@/lib/provider-config';
 
@@ -26,6 +27,12 @@ interface AuthFlowState {
 interface StartAuthOptions {
   nickname?: string;
   kiroMethod?: string;
+  kiroIDCStartUrl?: string;
+  kiroIDCRegion?: string;
+  kiroIDCFlow?: 'authcode' | 'device';
+  gitlabAuthMode?: 'oauth' | 'pat';
+  gitlabBaseUrl?: string;
+  gitlabPersonalAccessToken?: string;
   flowType?: 'authorization_code' | 'device_code';
   startEndpoint?: 'start' | 'start-url';
   riskAcknowledgement?: {
@@ -43,6 +50,11 @@ const POLL_INTERVAL = 3000;
 const MAX_POLL_DURATION = 5 * 60 * 1000;
 /** Fail visibly after repeated poll transport errors instead of retrying forever */
 const MAX_POLL_FAILURES = 3;
+
+function invalidateCliproxyRoutingData(queryClient: ReturnType<typeof useQueryClient>): void {
+  queryClient.invalidateQueries({ queryKey: ['cliproxy-catalog'] });
+  queryClient.invalidateQueries({ queryKey: ['cliproxy-models'] });
+}
 
 async function parseResponseBody(response: Response): Promise<Record<string, unknown>> {
   const text = await response.text();
@@ -69,7 +81,9 @@ const INITIAL_STATE: AuthFlowState = {
 };
 
 export function useCliproxyAuthFlow() {
+  const { t } = useTranslation();
   const [state, setState] = useState<AuthFlowState>(INITIAL_STATE);
+  const stateRef = useRef<AuthFlowState>(INITIAL_STATE);
 
   const attemptIdRef = useRef(0);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -102,6 +116,10 @@ export function useCliproxyAuthFlow() {
     };
   }, [stopPolling]);
 
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
   // Poll OAuth status
   const pollStatus = useCallback(
     async (provider: string, oauthState: string, attemptId: number) => {
@@ -116,7 +134,7 @@ export function useCliproxyAuthFlow() {
           setState((prev) => ({
             ...prev,
             isAuthenticating: false,
-            error: 'Authentication timed out. Please try again.',
+            error: t('toasts.providerAuthTimeout'),
           }));
         }
         return;
@@ -145,7 +163,7 @@ export function useCliproxyAuthFlow() {
           const hasAccount = typeof data.account === 'object' && data.account !== null;
           if (!hasAccount) {
             stopPolling();
-            const errorMsg = 'Authenticated account could not be registered';
+            const errorMsg = t('toasts.providerAccountRegistrationFailed');
             toast.error(errorMsg);
             setState((prev) => ({
               ...prev,
@@ -159,7 +177,8 @@ export function useCliproxyAuthFlow() {
           queryClient.invalidateQueries({ queryKey: ['cliproxy-auth'] });
           queryClient.invalidateQueries({ queryKey: ['cliproxy-accounts'] });
           queryClient.invalidateQueries({ queryKey: ['account-quota'] });
-          toast.success(`${provider} authentication successful`);
+          invalidateCliproxyRoutingData(queryClient);
+          toast.success(t('toasts.providerAuthSuccess', { provider }));
           openedAuthUrlRef.current = false;
           setState(INITIAL_STATE);
         } else if (data.status === 'auth_url') {
@@ -180,7 +199,7 @@ export function useCliproxyAuthFlow() {
             data.user_code && data.verification_url
               ? `Open ${data.verification_url} and enter code: ${data.user_code}`
               : 'Switch to Device Code method and try again.';
-          toast.error('Provider returned Device Code flow in callback mode');
+          toast.error(t('toasts.providerDeviceCodeInCallback'));
           setState((prev) => ({
             ...prev,
             isAuthenticating: false,
@@ -211,7 +230,7 @@ export function useCliproxyAuthFlow() {
         const message =
           error instanceof Error && error.message.trim().length > 0
             ? error.message
-            : 'Lost contact with the auth status endpoint';
+            : t('toasts.providerLostStatusEndpoint');
         toast.error(message);
         setState((prev) => ({
           ...prev,
@@ -220,7 +239,7 @@ export function useCliproxyAuthFlow() {
         }));
       }
     },
-    [isActiveAttempt, queryClient, stopPolling]
+    [isActiveAttempt, queryClient, stopPolling, t]
   );
 
   const startAuth = useCallback(
@@ -228,7 +247,7 @@ export function useCliproxyAuthFlow() {
       if (!isValidProvider(provider)) {
         setState({
           ...INITIAL_STATE,
-          error: `Unknown provider: ${provider}`,
+          error: t('toasts.providerUnknown', { provider }),
         });
         return;
       }
@@ -253,6 +272,12 @@ export function useCliproxyAuthFlow() {
       const payload = {
         nickname: options?.nickname,
         kiroMethod: options?.kiroMethod,
+        kiroIDCStartUrl: options?.kiroIDCStartUrl,
+        kiroIDCRegion: options?.kiroIDCRegion,
+        kiroIDCFlow: options?.kiroIDCFlow,
+        gitlabAuthMode: options?.gitlabAuthMode,
+        gitlabBaseUrl: options?.gitlabBaseUrl,
+        gitlabPersonalAccessToken: options?.gitlabPersonalAccessToken,
         riskAcknowledgement: options?.riskAcknowledgement,
       };
 
@@ -290,6 +315,7 @@ export function useCliproxyAuthFlow() {
                 queryClient.invalidateQueries({ queryKey: ['cliproxy-auth'] });
                 queryClient.invalidateQueries({ queryKey: ['cliproxy-accounts'] });
                 queryClient.invalidateQueries({ queryKey: ['account-quota'] });
+                invalidateCliproxyRoutingData(queryClient);
                 // Note: No toast here - DeviceCodeDialog's useDeviceCode hook handles success toast
                 // via deviceCodeCompleted WebSocket event to avoid duplicate toasts
                 openedAuthUrlRef.current = false;
@@ -299,8 +325,8 @@ export function useCliproxyAuthFlow() {
                   typeof data.error === 'string'
                     ? data.error
                     : success
-                      ? 'Authenticated account could not be registered'
-                      : 'Authentication failed';
+                      ? t('toasts.providerAccountRegistrationFailed')
+                      : t('auth.loginFailed');
                 toast.error(errorMsg);
                 setState((prev) => ({
                   ...prev,
@@ -345,7 +371,8 @@ export function useCliproxyAuthFlow() {
           const success = data.success === true;
 
           if (!response.ok || !success) {
-            const errorMsg = typeof data.error === 'string' ? data.error : 'Failed to start OAuth';
+            const errorMsg =
+              typeof data.error === 'string' ? data.error : t('toasts.providerStartOAuthFailed');
             throw new Error(errorMsg);
           }
 
@@ -368,6 +395,16 @@ export function useCliproxyAuthFlow() {
           // Start polling for completion
           if (oauthState) {
             pollStartRef.current = Date.now();
+            if (!authUrl) {
+              await pollStatus(provider, oauthState, attemptId);
+              if (!isActiveAttempt(attemptId)) {
+                return;
+              }
+              const currentState = stateRef.current;
+              if (!currentState.isAuthenticating || currentState.provider !== provider) {
+                return;
+              }
+            }
             pollIntervalRef.current = setInterval(() => {
               void pollStatus(provider, oauthState, attemptId);
             }, POLL_INTERVAL);
@@ -382,7 +419,7 @@ export function useCliproxyAuthFlow() {
           setState(INITIAL_STATE);
           return;
         }
-        const message = error instanceof Error ? error.message : 'Authentication failed';
+        const message = error instanceof Error ? error.message : t('auth.loginFailed');
         toast.error(message);
         setState((prev) => ({
           ...prev,
@@ -391,7 +428,7 @@ export function useCliproxyAuthFlow() {
         }));
       }
     },
-    [isActiveAttempt, pollStatus, stopPolling, queryClient]
+    [isActiveAttempt, pollStatus, stopPolling, queryClient, t]
   );
 
   const cancelAuth = useCallback(() => {
@@ -432,34 +469,43 @@ export function useCliproxyAuthFlow() {
           return;
         }
         const success = data.success === true;
+        const waitingForLocalToken = data.status === 'wait';
         const hasAccount = typeof data.account === 'object' && data.account !== null;
 
-        if (response.ok && success && hasAccount) {
+        if (response.ok && waitingForLocalToken) {
+          setState((prev) => ({
+            ...prev,
+            isSubmittingCallback: false,
+            error: null,
+          }));
+        } else if (response.ok && success && hasAccount) {
           stopPolling();
           queryClient.invalidateQueries({ queryKey: ['cliproxy-auth'] });
           queryClient.invalidateQueries({ queryKey: ['cliproxy-accounts'] });
           queryClient.invalidateQueries({ queryKey: ['account-quota'] });
-          toast.success(`${currentProvider} authentication successful`);
+          invalidateCliproxyRoutingData(queryClient);
+          toast.success(t('toasts.providerAuthSuccess', { provider: currentProvider }));
           setState(INITIAL_STATE);
         } else {
           const errorMsg =
             typeof data.error === 'string'
               ? data.error
               : success
-                ? 'Authenticated account could not be registered'
-                : 'Callback submission failed';
+                ? t('toasts.providerAccountRegistrationFailed')
+                : t('toasts.providerCallbackFailed');
           throw new Error(errorMsg);
         }
       } catch (error) {
         if (!isActiveAttempt(attemptId)) {
           return;
         }
-        const message = error instanceof Error ? error.message : 'Failed to submit callback';
+        const message =
+          error instanceof Error ? error.message : t('toasts.providerSubmitCallbackFailed');
         toast.error(message);
         setState((prev) => ({ ...prev, isSubmittingCallback: false, error: message }));
       }
     },
-    [isActiveAttempt, state.provider, queryClient, stopPolling]
+    [isActiveAttempt, state.provider, queryClient, stopPolling, t]
   );
 
   return useMemo(

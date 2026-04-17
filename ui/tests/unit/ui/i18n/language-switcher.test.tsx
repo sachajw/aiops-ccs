@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, userEvent, waitFor } from '@tests/setup/test-utils';
 import i18n from '@/lib/i18n';
+import { ContinuityOverview } from '@/components/account/continuity-overview';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
-import { HistorySyncLearningMap } from '@/components/account/history-sync-learning-map';
 import { TabNavigation } from '@/pages/settings/components/tab-navigation';
 import {
   getInitialLocale,
@@ -137,37 +137,61 @@ describe('Dashboard i18n', () => {
     expect(screen.getByText('思考')).toBeInTheDocument();
   });
 
-  it('renders Japanese history sync guidance without fallback English copy', async () => {
-    await i18n.changeLanguage('ja');
+  it('uses single-account-specific next steps in the continuity overview', async () => {
+    await i18n.changeLanguage('en');
 
     render(
-      <HistorySyncLearningMap
+      <ContinuityOverview
+        totalAccounts={1}
         isolatedCount={1}
-        sharedStandardCount={2}
-        deeperSharedCount={3}
-        sharedGroups={['default']}
-        legacyTargetCount={2}
-        cliproxyCount={1}
+        sharedStandardCount={0}
+        deeperSharedCount={0}
+        sharedAloneCount={0}
+        sharedPeerAccountCount={0}
+        deeperReadyAccountCount={0}
+        sharedGroups={[]}
+        sharedPeerGroups={[]}
+        deeperReadyGroups={[]}
+        legacyTargetCount={0}
+        cliproxyCount={0}
       />
     );
 
-    expect(screen.getByText('履歴同期の仕組み')).toBeInTheDocument();
     expect(
-      screen.getByText('1 件の CLIProxy Claude Pool アカウントは、CLIProxy ページで管理します。')
-    ).toBeInTheDocument();
-
-    await userEvent.click(
-      screen.getByRole('button', { name: '詳細を表示: グループ、切り替え、レガシーポリシー' })
-    );
-
-    expect(
-      screen.getByText('2 件のレガシーアカウントで明示的な確認がまだ必要です。')
+      screen.getByText(
+        'Cross-account handoff does not apply yet. Add another auth account before configuring shared continuity.'
+      )
     ).toBeInTheDocument();
   });
 
-  it.each(SUPPORTED_LOCALES.filter((locale) => locale !== 'en'))(
+  it('pluralizes the shared-alone readiness copy', async () => {
+    await i18n.changeLanguage('en');
+
+    render(
+      <ContinuityOverview
+        totalAccounts={3}
+        isolatedCount={1}
+        sharedStandardCount={2}
+        deeperSharedCount={0}
+        sharedAloneCount={2}
+        sharedPeerAccountCount={0}
+        deeperReadyAccountCount={0}
+        sharedGroups={[]}
+        sharedPeerGroups={[]}
+        deeperReadyGroups={[]}
+        legacyTargetCount={0}
+        cliproxyCount={0}
+      />
+    );
+
+    expect(
+      screen.getByText('2 shared accounts are still waiting for another account in the same group.')
+    ).toBeInTheDocument();
+  });
+
+  it.each(SUPPORTED_LOCALES.filter((locale: string) => locale !== 'en'))(
     'keeps %s translation keys in parity with en and preserves placeholders',
-    (locale) => {
+    (locale: string) => {
       const resources = i18n.options.resources as
         | Record<string, { translation: Record<string, unknown> }>
         | undefined;

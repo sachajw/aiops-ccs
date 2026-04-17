@@ -151,6 +151,216 @@ describe('useCliproxyAuthFlow', () => {
     expect(toast.error).toHaveBeenCalledWith('poll failed');
   });
 
+  it('keeps polling through wait responses until a later ok response includes the account', async () => {
+    let pollCount = 0;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/start-url')) {
+          return Promise.resolve(
+            createJsonResponse({
+              success: true,
+              authUrl: 'https://auth.example/wait-ok',
+              state: 'state-wait-ok',
+            })
+          );
+        }
+
+        if (url.includes('/status?state=state-wait-ok')) {
+          pollCount += 1;
+          if (pollCount === 1) {
+            return Promise.resolve(createJsonResponse({ status: 'wait' }));
+          }
+
+          return Promise.resolve(
+            createJsonResponse({
+              status: 'ok',
+              account: {
+                id: 'delayed@example.com',
+                email: 'delayed@example.com',
+                nickname: 'delayed',
+                provider: 'codex',
+                isDefault: true,
+              },
+            })
+          );
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      })
+    );
+
+    const { result } = renderHook(() => useCliproxyAuthFlow(), { wrapper });
+
+    await act(async () => {
+      await result.current.startAuth('codex', { startEndpoint: 'start-url' });
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.isAuthenticating).toBe(true);
+    expect(result.current.oauthState).toBe('state-wait-ok');
+    expect(result.current.error).toBeNull();
+    expect(toast.success).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.isAuthenticating).toBe(false);
+    expect(result.current.oauthState).toBeNull();
+    expect(toast.success).toHaveBeenCalledWith('codex authentication successful');
+  });
+
+  it('promotes a state-first auth bootstrap into an immediate auth URL without waiting for the first interval', async () => {
+    let pollCount = 0;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/start-url')) {
+          return Promise.resolve(
+            createJsonResponse({
+              success: true,
+              authUrl: null,
+              state: 'state-kiro-social',
+            })
+          );
+        }
+
+        if (url.includes('/status?state=state-kiro-social')) {
+          pollCount += 1;
+          return Promise.resolve(
+            createJsonResponse({
+              status: 'auth_url',
+              url: 'https://auth.example/kiro-social',
+            })
+          );
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      })
+    );
+
+    const { result } = renderHook(() => useCliproxyAuthFlow(), { wrapper });
+
+    await act(async () => {
+      await result.current.startAuth('kiro', { startEndpoint: 'start-url', kiroMethod: 'google' });
+    });
+
+    expect(result.current.authUrl).toBe('https://auth.example/kiro-social');
+    expect(result.current.oauthState).toBe('state-kiro-social');
+    expect(result.current.isAuthenticating).toBe(true);
+    expect(pollCount).toBe(1);
+  });
+
+  it('forwards Kiro IDC options to the backend start endpoint payload', async () => {
+    let requestBody: Record<string, unknown> | null = null;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url.includes('/start')) {
+          requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          return createJsonResponse({
+            success: true,
+            account: {
+              id: 'kiro-idc-account',
+              provider: 'kiro',
+            },
+          });
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      })
+    );
+
+    const { result } = renderHook(() => useCliproxyAuthFlow(), { wrapper });
+
+    await act(async () => {
+      await result.current.startAuth('kiro', {
+        startEndpoint: 'start',
+        flowType: 'authorization_code',
+        kiroMethod: 'idc',
+        kiroIDCStartUrl: 'https://d-123.awsapps.com/start',
+        kiroIDCRegion: 'ca-central-1',
+        kiroIDCFlow: 'authcode',
+      });
+    });
+
+    expect(requestBody).toEqual({
+      nickname: undefined,
+      kiroMethod: 'idc',
+      kiroIDCStartUrl: 'https://d-123.awsapps.com/start',
+      kiroIDCRegion: 'ca-central-1',
+      kiroIDCFlow: 'authcode',
+      gitlabAuthMode: undefined,
+      gitlabBaseUrl: undefined,
+      gitlabPersonalAccessToken: undefined,
+      riskAcknowledgement: undefined,
+    });
+  });
+
+  it('forwards GitLab PAT options to the backend start endpoint payload', async () => {
+    let requestBody: Record<string, unknown> | null = null;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+
+        if (url.includes('/start')) {
+          requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+          return createJsonResponse({
+            success: true,
+            account: {
+              id: 'gitlab-account',
+              provider: 'gitlab',
+            },
+          });
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      })
+    );
+
+    const { result } = renderHook(() => useCliproxyAuthFlow(), { wrapper });
+
+    await act(async () => {
+      await result.current.startAuth('gitlab', {
+        startEndpoint: 'start',
+        gitlabAuthMode: 'pat',
+        gitlabBaseUrl: 'https://gitlab.example.com',
+        gitlabPersonalAccessToken: 'glpat-test-token',
+      });
+    });
+
+    expect(requestBody).toEqual({
+      nickname: undefined,
+      kiroMethod: undefined,
+      kiroIDCStartUrl: undefined,
+      kiroIDCRegion: undefined,
+      kiroIDCFlow: undefined,
+      gitlabAuthMode: 'pat',
+      gitlabBaseUrl: 'https://gitlab.example.com',
+      gitlabPersonalAccessToken: 'glpat-test-token',
+      riskAcknowledgement: undefined,
+    });
+  });
+
   it('treats callback responses without an account as failures', async () => {
     vi.stubGlobal(
       'fetch',
@@ -195,6 +405,71 @@ describe('useCliproxyAuthFlow', () => {
     expect(result.current.isSubmittingCallback).toBe(false);
     expect(toast.error).toHaveBeenCalledWith('Authenticated account could not be registered');
     expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('keeps auth active when callback submission returns wait and only errors on the terminal poll', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/start-url')) {
+          return Promise.resolve(
+            createJsonResponse({
+              success: true,
+              authUrl: 'https://auth.example/callback-wait',
+              state: 'state-callback-wait',
+            })
+          );
+        }
+
+        if (url.includes('/submit-callback')) {
+          return Promise.resolve(createJsonResponse({ status: 'wait' }));
+        }
+
+        if (url.includes('/status?state=state-callback-wait')) {
+          return Promise.resolve(
+            createJsonResponse({
+              status: 'error',
+              error:
+                'Authentication completed upstream, but no new local token was saved for this account. Update CCS/CLIProxy and retry.',
+            })
+          );
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      })
+    );
+
+    const { result } = renderHook(() => useCliproxyAuthFlow(), { wrapper });
+
+    await act(async () => {
+      await result.current.startAuth('codex', { startEndpoint: 'start-url' });
+    });
+
+    await act(async () => {
+      await result.current.submitCallback(
+        'http://localhost/callback?code=abc123&state=state-callback-wait'
+      );
+    });
+
+    expect(result.current.isSubmittingCallback).toBe(false);
+    expect(result.current.isAuthenticating).toBe(true);
+    expect(result.current.error).toBeNull();
+
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.isAuthenticating).toBe(false);
+    expect(result.current.error).toBe(
+      'Authentication completed upstream, but no new local token was saved for this account. Update CCS/CLIProxy and retry.'
+    );
+    expect(toast.error).toHaveBeenCalledWith(
+      'Authentication completed upstream, but no new local token was saved for this account. Update CCS/CLIProxy and retry.'
+    );
   });
 
   it('treats status ok responses without an account as failures', async () => {

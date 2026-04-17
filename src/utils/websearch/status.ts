@@ -6,19 +6,108 @@
  * @module utils/websearch/status
  */
 
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { ok, warn, fail, info } from '../ui';
 import { getWebSearchConfig } from '../../config/unified-config-loader';
+import { getCcsDir } from '../config-manager';
 import { getGeminiCliStatus, isGeminiAuthenticated } from './gemini-cli';
 import { getGrokCliStatus } from './grok-cli';
 import { getOpenCodeCliStatus } from './opencode-cli';
-import type { WebSearchCliInfo, WebSearchStatus } from './types';
+import { getWebSearchApiKeyStates } from './provider-secrets';
+import { normalizeSearxngBaseUrl, type WebSearchCliInfo, type WebSearchStatus } from './types';
+
+const PROVIDER_STATE_FILE = 'websearch-provider-state.json';
+
+type ProviderCooldown = {
+  reason: string;
+  until: number;
+};
 
 function hasEnvValue(name: string): boolean {
   return (process.env[name] || '').trim().length > 0;
 }
 
-function hasAnyEnvValue(names: string[]): boolean {
-  return names.some((name) => hasEnvValue(name));
+function hasValidSearxngUrl(url: string | undefined): boolean {
+  const normalized = normalizeSearxngBaseUrl(url);
+  return normalized !== null && normalized !== '';
+}
+
+function getProviderStatePath(): string {
+  return join(getCcsDir(), 'cache', PROVIDER_STATE_FILE);
+}
+
+function readProviderCooldowns(now = Date.now()): Record<string, ProviderCooldown> {
+  try {
+    const statePath = getProviderStatePath();
+    if (!existsSync(statePath)) {
+      return {};
+    }
+
+    const parsed = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      cooldowns?: Record<string, { reason?: unknown; until?: unknown }>;
+    };
+    const nextCooldowns: Record<string, ProviderCooldown> = {};
+
+    for (const [providerId, entry] of Object.entries(parsed.cooldowns || {})) {
+      const until = Number.parseInt(String(entry?.until || ''), 10);
+      if (!Number.isFinite(until) || until <= now) {
+        continue;
+      }
+
+      nextCooldowns[providerId] = {
+        reason: typeof entry?.reason === 'string' ? entry.reason : 'rate_limited',
+        until,
+      };
+    }
+
+    return nextCooldowns;
+  } catch {
+    return {};
+  }
+}
+
+function formatCooldownDuration(until: number, now = Date.now()): string {
+  const remainingSec = Math.max(1, Math.ceil((until - now) / 1000));
+  if (remainingSec >= 3600) {
+    return `~${Math.ceil(remainingSec / 3600)}h`;
+  }
+  if (remainingSec >= 60) {
+    return `~${Math.ceil(remainingSec / 60)}m`;
+  }
+  return `~${remainingSec}s`;
+}
+
+function formatCooldownReason(reason: string): string {
+  switch (reason) {
+    case 'quota_exhausted':
+      return 'quota exhaustion';
+    case 'rate_limited':
+      return 'rate limiting';
+    default:
+      return 'a temporary provider error';
+  }
+}
+
+function applyCooldownStatus(
+  provider: WebSearchCliInfo,
+  cooldowns: Record<string, ProviderCooldown>,
+  now = Date.now()
+): WebSearchCliInfo {
+  if (!(provider.enabled && provider.available)) {
+    return provider;
+  }
+
+  const cooldown = cooldowns[provider.id];
+  if (!cooldown) {
+    return provider;
+  }
+
+  return {
+    ...provider,
+    available: false,
+    detail: `Cooling down ${formatCooldownDuration(cooldown.until, now)} after ${formatCooldownReason(cooldown.reason)}`,
+  };
 }
 
 function getLegacyProviderStatuses(): WebSearchCliInfo[] {
@@ -88,40 +177,75 @@ function getLegacyProviderStatuses(): WebSearchCliInfo[] {
  */
 export function getWebSearchCliProviders(): WebSearchCliInfo[] {
   const wsConfig = getWebSearchConfig();
+  const apiKeyStates = getWebSearchApiKeyStates();
+  const cooldowns = readProviderCooldowns();
   const providers: WebSearchCliInfo[] = [
     {
       id: 'exa',
       kind: 'backend',
       name: 'Exa',
       enabled: wsConfig.providers?.exa?.enabled ?? false,
-      available:
-        (wsConfig.providers?.exa?.enabled ?? false) &&
-        hasAnyEnvValue(['EXA_API_KEY', 'CCS_WEBSEARCH_EXA_API_KEY']),
+      available: (wsConfig.providers?.exa?.enabled ?? false) && apiKeyStates.exa.available,
       version: null,
       docsUrl: 'https://docs.exa.ai/reference/search',
       requiresApiKey: true,
       apiKeyEnvVar: 'EXA_API_KEY',
       description: 'API-backed search with strong relevance and content extraction.',
-      detail: hasAnyEnvValue(['EXA_API_KEY', 'CCS_WEBSEARCH_EXA_API_KEY'])
+      detail: apiKeyStates.exa.available
         ? `API key detected (${wsConfig.providers?.exa?.max_results ?? 5} results)`
-        : 'Set EXA_API_KEY',
+        : apiKeyStates.exa.configured
+          ? 'Stored in dashboard, but Global Env is disabled'
+          : 'Set EXA_API_KEY',
     },
     {
       id: 'tavily',
       kind: 'backend',
       name: 'Tavily',
       enabled: wsConfig.providers?.tavily?.enabled ?? false,
-      available:
-        (wsConfig.providers?.tavily?.enabled ?? false) &&
-        hasAnyEnvValue(['TAVILY_API_KEY', 'CCS_WEBSEARCH_TAVILY_API_KEY']),
+      available: (wsConfig.providers?.tavily?.enabled ?? false) && apiKeyStates.tavily.available,
       version: null,
       docsUrl: 'https://docs.tavily.com/documentation/api-reference/endpoint/search',
       requiresApiKey: true,
       apiKeyEnvVar: 'TAVILY_API_KEY',
       description: 'Search API optimized for agent workflows and concise web result synthesis.',
-      detail: hasAnyEnvValue(['TAVILY_API_KEY', 'CCS_WEBSEARCH_TAVILY_API_KEY'])
+      detail: apiKeyStates.tavily.available
         ? `API key detected (${wsConfig.providers?.tavily?.max_results ?? 5} results)`
-        : 'Set TAVILY_API_KEY',
+        : apiKeyStates.tavily.configured
+          ? 'Stored in dashboard, but Global Env is disabled'
+          : 'Set TAVILY_API_KEY',
+    },
+    {
+      id: 'brave',
+      kind: 'backend',
+      name: 'Brave Search',
+      enabled: wsConfig.providers?.brave?.enabled ?? false,
+      available: (wsConfig.providers?.brave?.enabled ?? false) && apiKeyStates.brave.available,
+      version: null,
+      docsUrl: 'https://brave.com/search/api/',
+      requiresApiKey: true,
+      apiKeyEnvVar: 'BRAVE_API_KEY',
+      description: 'API-backed web search with cleaner result metadata.',
+      detail: apiKeyStates.brave.available
+        ? `API key detected (${wsConfig.providers?.brave?.max_results ?? 5} results)`
+        : apiKeyStates.brave.configured
+          ? 'Stored in dashboard, but Global Env is disabled'
+          : 'Set BRAVE_API_KEY',
+    },
+    {
+      id: 'searxng',
+      kind: 'backend',
+      name: 'SearXNG',
+      enabled: wsConfig.providers?.searxng?.enabled ?? false,
+      available:
+        (wsConfig.providers?.searxng?.enabled ?? false) &&
+        hasValidSearxngUrl(wsConfig.providers?.searxng?.url),
+      version: null,
+      docsUrl: 'https://docs.searxng.org/dev/search_api.html',
+      requiresApiKey: false,
+      description: 'Configurable SearXNG JSON backend for self-hosted or public instances.',
+      detail: hasValidSearxngUrl(wsConfig.providers?.searxng?.url)
+        ? `Configured (${wsConfig.providers?.searxng?.max_results ?? 5} results)`
+        : 'Set a valid SearXNG base URL',
     },
     {
       id: 'duckduckgo',
@@ -135,26 +259,11 @@ export function getWebSearchCliProviders(): WebSearchCliInfo[] {
       description: 'Default built-in HTML search backend. Zero setup.',
       detail: `Built-in (${wsConfig.providers?.duckduckgo?.max_results ?? 5} results)`,
     },
-    {
-      id: 'brave',
-      kind: 'backend',
-      name: 'Brave Search',
-      enabled: wsConfig.providers?.brave?.enabled ?? false,
-      available:
-        (wsConfig.providers?.brave?.enabled ?? false) &&
-        hasAnyEnvValue(['BRAVE_API_KEY', 'CCS_WEBSEARCH_BRAVE_API_KEY']),
-      version: null,
-      docsUrl: 'https://brave.com/search/api/',
-      requiresApiKey: true,
-      apiKeyEnvVar: 'BRAVE_API_KEY',
-      description: 'API-backed web search with cleaner result metadata.',
-      detail: hasAnyEnvValue(['BRAVE_API_KEY', 'CCS_WEBSEARCH_BRAVE_API_KEY'])
-        ? `API key detected (${wsConfig.providers?.brave?.max_results ?? 5} results)`
-        : 'Set BRAVE_API_KEY',
-    },
   ];
 
-  return [...providers, ...getLegacyProviderStatuses()];
+  return [...providers, ...getLegacyProviderStatuses()].map((provider) =>
+    applyCooldownStatus(provider, cooldowns)
+  );
 }
 
 /**
@@ -175,19 +284,17 @@ export function getCliInstallHints(): string[] {
   return [
     'WebSearch: no ready providers',
     '    Enable DuckDuckGo in Settings > WebSearch for zero-setup search',
+    '    Or enable SearXNG and set a valid base URL (must support /search?format=json)',
     '    Or export EXA_API_KEY, TAVILY_API_KEY, or BRAVE_API_KEY for API-backed search',
     '    Optional legacy fallback: npm i -g @google/gemini-cli',
   ];
 }
 
-/**
- * Get WebSearch readiness status for display.
- */
-export function getWebSearchReadiness(): WebSearchStatus {
-  const wsConfig = getWebSearchConfig();
-  const providers = getWebSearchCliProviders();
-
-  if (!wsConfig.enabled) {
+export function buildWebSearchReadiness(
+  enabled: boolean,
+  providers: WebSearchCliInfo[]
+): WebSearchStatus {
+  if (!enabled) {
     return {
       readiness: 'unavailable',
       message: 'Disabled in config',
@@ -221,6 +328,15 @@ export function getWebSearchReadiness(): WebSearchStatus {
     message: 'Enable at least one provider in Settings > WebSearch',
     providers,
   };
+}
+
+/**
+ * Get WebSearch readiness status for display.
+ */
+export function getWebSearchReadiness(): WebSearchStatus {
+  const wsConfig = getWebSearchConfig();
+  const providers = getWebSearchCliProviders();
+  return buildWebSearchReadiness(wsConfig.enabled, providers);
 }
 
 /**

@@ -8,7 +8,8 @@ import { getCcsDir, getConfigPath, loadConfigSafe } from '../../utils/config-man
 import { expandPath } from '../../utils/helpers';
 import { validateApiName } from './validation-service';
 import { mutateUnifiedConfig, isUnifiedMode } from '../../config/unified-config-loader';
-import { ensureProfileHooks } from '../../utils/websearch/profile-hook-injector';
+import { ensureWebSearchMcpOrThrow } from '../../utils/websearch-manager';
+import { ensureImageAnalysisMcpOrThrow } from '../../utils/image-analysis';
 import type { TargetType } from '../../targets/target-adapter';
 import { resolveDroidProvider } from '../../targets/droid-provider';
 import { isReservedName } from '../../config/reserved-names';
@@ -69,6 +70,21 @@ function getDeniedModelReason(baseUrl: string, models: ModelMapping): string | n
   return null;
 }
 
+function rollbackSettingsFile(
+  filePath: string,
+  previousContent: string | null,
+  existedBefore: boolean
+): void {
+  if (existedBefore && previousContent !== null) {
+    fs.writeFileSync(filePath, previousContent, 'utf8');
+    return;
+  }
+
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+}
+
 /** Create settings.json file for API profile (legacy format) */
 function createSettingsFile(
   name: string,
@@ -105,11 +121,18 @@ function createSettingsFile(
     },
   };
 
+  const settingsExisted = fs.existsSync(settingsPath);
+  const previousSettingsContent = settingsExisted ? fs.readFileSync(settingsPath, 'utf8') : null;
   fs.mkdirSync(ccsDir, { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
 
-  // Inject WebSearch hooks into profile settings
-  ensureProfileHooks(name);
+  try {
+    ensureWebSearchMcpOrThrow();
+    ensureImageAnalysisMcpOrThrow();
+  } catch (error) {
+    rollbackSettingsFile(settingsPath, previousSettingsContent, settingsExisted);
+    throw error;
+  }
 
   return settingsPath;
 }
@@ -189,10 +212,17 @@ function createApiProfileUnified(
     fs.mkdirSync(ccsDir, { recursive: true });
   }
 
+  const settingsExisted = fs.existsSync(settingsPath);
+  const previousSettingsContent = settingsExisted ? fs.readFileSync(settingsPath, 'utf8') : null;
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
 
-  // Inject WebSearch hooks into profile settings
-  ensureProfileHooks(name);
+  try {
+    ensureWebSearchMcpOrThrow();
+    ensureImageAnalysisMcpOrThrow();
+  } catch (error) {
+    rollbackSettingsFile(settingsPath, previousSettingsContent, settingsExisted);
+    throw error;
+  }
 
   mutateUnifiedConfig((config) => {
     config.profiles[name] = {

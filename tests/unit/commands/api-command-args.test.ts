@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  applyClaudeExtendedContextPreference,
   collectUnexpectedApiArgs,
+  hasClaudeModelMapping,
+  hasExplicitClaudeExtendedContext,
   parseApiCommandArgs,
 } from '../../../src/commands/api-command/shared';
 
@@ -72,6 +75,13 @@ describe('api-command arg parser', () => {
     ]);
   });
 
+  test('rejects runtime-only codex as a persisted API target value', () => {
+    const parsed = parseApiCommandArgs(['my-api', '--target', 'codex']);
+
+    expect(parsed.target).toBeUndefined();
+    expect(parsed.errors).toEqual(['Invalid --target value "codex". Use: claude or droid']);
+  });
+
   test('collects missing-value error for --target with no value', () => {
     const parsed = parseApiCommandArgs(['my-api', '--target']);
 
@@ -132,6 +142,27 @@ describe('api-command arg parser', () => {
     expect(parsed.model).toBe('-preview');
     expect(parsed.errors).toEqual([]);
   });
+
+  test('parses --1m for explicit Claude long context', () => {
+    const parsed = parseApiCommandArgs(['my-api', '--1m']);
+
+    expect(parsed.extendedContext).toBe(true);
+    expect(parsed.errors).toEqual([]);
+  });
+
+  test('parses --no-1m for explicit standard-context preference', () => {
+    const parsed = parseApiCommandArgs(['my-api', '--no-1m']);
+
+    expect(parsed.extendedContext).toBe(false);
+    expect(parsed.errors).toEqual([]);
+  });
+
+  test('rejects conflicting --1m and --no-1m flags', () => {
+    const parsed = parseApiCommandArgs(['my-api', '--1m', '--no-1m']);
+
+    expect(parsed.extendedContext).toBeUndefined();
+    expect(parsed.errors).toEqual(['Cannot combine --1m and --no-1m']);
+  });
 });
 
 describe('collectUnexpectedApiArgs', () => {
@@ -153,5 +184,57 @@ describe('collectUnexpectedApiArgs', () => {
 
     expect(parsed.positionals).toEqual(['value']);
     expect(parsed.errors).toEqual(['Unknown option: --bogus', 'Unexpected arguments: value']);
+  });
+});
+
+describe('Claude long-context mapping helpers', () => {
+  test('detects Claude mappings and explicit [1m] state across all tiers', () => {
+    const models = {
+      default: 'gpt-5.4',
+      opus: 'claude-opus-4-6[1m]',
+      sonnet: 'claude-sonnet-4-6',
+      haiku: 'claude-haiku-4-5-20251001',
+    };
+
+    expect(hasClaudeModelMapping(models)).toBe(true);
+    expect(hasExplicitClaudeExtendedContext(models)).toBe(true);
+  });
+
+  test('applies [1m] only to compatible Claude mappings and leaves Haiku plain', () => {
+    const models = applyClaudeExtendedContextPreference(
+      {
+        default: 'claude-sonnet-4-6',
+        opus: 'claude-opus-4-6',
+        sonnet: 'claude-sonnet-4-6',
+        haiku: 'claude-haiku-4-5-20251001',
+      },
+      true
+    );
+
+    expect(models).toEqual({
+      default: 'claude-sonnet-4-6[1m]',
+      opus: 'claude-opus-4-6[1m]',
+      sonnet: 'claude-sonnet-4-6[1m]',
+      haiku: 'claude-haiku-4-5-20251001',
+    });
+  });
+
+  test('strips [1m] from Claude mappings when standard context is requested', () => {
+    const models = applyClaudeExtendedContextPreference(
+      {
+        default: 'claude-sonnet-4-6[1m]',
+        opus: 'claude-opus-4-6[1m]',
+        sonnet: 'claude-sonnet-4-6[1m]',
+        haiku: 'claude-haiku-4-5-20251001',
+      },
+      false
+    );
+
+    expect(models).toEqual({
+      default: 'claude-sonnet-4-6',
+      opus: 'claude-opus-4-6',
+      sonnet: 'claude-sonnet-4-6',
+      haiku: 'claude-haiku-4-5-20251001',
+    });
   });
 });

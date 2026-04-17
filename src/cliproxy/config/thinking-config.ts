@@ -65,7 +65,7 @@ export function detectTierFromModel(modelName: string): ModelTier {
  *
  * @param model - Base model name
  * @param thinkingValue - Level name (e.g., 'high') or numeric budget
- * @returns Model name with thinking suffix, e.g., "gemini-3-pro-preview(high)"
+ * @returns Model name with thinking suffix, e.g., "gemini-3.1-pro-preview(high)"
  */
 export function applyThinkingSuffix(model: string, thinkingValue: string | number): string {
   return applyThinkingSuffixForProvider(model, thinkingValue);

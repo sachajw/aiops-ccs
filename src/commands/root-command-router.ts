@@ -16,7 +16,7 @@ async function printUpdateCommandHelp(): Promise<void> {
   console.log('');
 }
 
-const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
+export const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
   {
     name: 'migrate',
     aliases: ['--migrate'],
@@ -55,9 +55,9 @@ const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
   {
     name: 'help',
     aliases: ['--help', '-h'],
-    handle: async () => {
-      const { handleHelpCommand } = await import('./help-command');
-      await handleHelpCommand();
+    handle: async (args) => {
+      const { handleHelpRoute } = await import('./help-command');
+      await handleHelpRoute(args);
     },
   },
   {
@@ -83,6 +83,13 @@ const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
     },
   },
   {
+    name: '__complete',
+    handle: async (args) => {
+      const { handleCompletionCommand } = await import('./completion-backend');
+      await handleCompletionCommand(args);
+    },
+  },
+  {
     name: 'doctor',
     aliases: ['--doctor'],
     handle: async (args) => {
@@ -96,6 +103,13 @@ const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
     handle: async () => {
       const { handleSyncCommand } = await import('./sync-command');
       await handleSyncCommand();
+    },
+  },
+  {
+    name: 'browser',
+    handle: async (args) => {
+      const { handleBrowserCommand } = await import('./browser-command');
+      await handleBrowserCommand(args);
     },
   },
   {
@@ -118,7 +132,7 @@ const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
   {
     name: 'api',
     handle: async (args) => {
-      const { handleApiCommand } = await import('./api-command');
+      const { handleApiCommand } = await import('./api-command/index');
       await handleApiCommand(args);
     },
   },
@@ -127,6 +141,20 @@ const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
     handle: async (args) => {
       const { handleCliproxyCommand } = await import('./cliproxy-command');
       await handleCliproxyCommand(args);
+    },
+  },
+  {
+    name: 'proxy',
+    handle: async (args) => {
+      const { handleProxyCommand } = await import('./proxy-command');
+      process.exit(await handleProxyCommand(args));
+    },
+  },
+  {
+    name: 'docker',
+    handle: async (args) => {
+      const { handleDockerCommand } = await import('./docker-command');
+      await handleDockerCommand(args);
     },
   },
   {
@@ -163,13 +191,6 @@ const ROOT_COMMAND_ROUTES: readonly NamedCommandRoute[] = [
     handle: async (args) => {
       const { handleSetupCommand } = await import('./setup-command');
       await handleSetupCommand(args);
-    },
-  },
-  {
-    name: 'cursor',
-    handle: async (args) => {
-      const { handleCursorCommand } = await import('./cursor-command');
-      process.exit(await handleCursorCommand(args));
     },
   },
 ];

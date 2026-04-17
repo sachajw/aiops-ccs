@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import {
+  getKiroStartIDCValidationError,
   getStartAuthFailureMessage,
   getStartAuthNicknameError,
   getStartUrlUnsupportedReason,
@@ -12,6 +13,15 @@ describe('cliproxy-auth-routes start-url guard', () => {
     );
     expect(getStartUrlUnsupportedReason('ghcp')).toContain("Provider 'ghcp' uses Device Code flow");
     expect(getStartUrlUnsupportedReason('qwen')).toContain("Provider 'qwen' uses Device Code flow");
+    expect(getStartUrlUnsupportedReason('cursor')).toContain(
+      "Provider 'cursor' uses Device Code flow"
+    );
+    expect(getStartUrlUnsupportedReason('codebuddy')).toContain(
+      "Provider 'codebuddy' uses Device Code flow"
+    );
+    expect(getStartUrlUnsupportedReason('kilo')).toContain(
+      "Provider 'kilo' uses Device Code flow"
+    );
   });
 
   it('allows Kiro social methods on start-url', () => {
@@ -25,10 +35,55 @@ describe('cliproxy-auth-routes start-url guard', () => {
     );
   });
 
+  it('rejects Kiro idc method on start-url', () => {
+    expect(getStartUrlUnsupportedReason('kiro', { kiroMethod: 'idc' })).toContain(
+      "Kiro method 'idc' uses CLI auth flow"
+    );
+  });
+
   it('allows authorization code providers', () => {
     expect(getStartUrlUnsupportedReason('gemini')).toBeNull();
     expect(getStartUrlUnsupportedReason('codex')).toBeNull();
     expect(getStartUrlUnsupportedReason('claude')).toBeNull();
+    expect(getStartUrlUnsupportedReason('gitlab')).toBeNull();
+  });
+});
+
+describe('cliproxy-auth-routes Kiro IDC start validation', () => {
+  it('requires an IDC start URL when idc auth is selected', () => {
+    expect(
+      getKiroStartIDCValidationError({
+        kiroMethod: 'idc',
+        kiroIDCStartUrl: undefined,
+        invalidKiroIDCFlow: false,
+      })
+    ).toEqual({
+      error: 'Kiro IDC login requires kiroIDCStartUrl',
+      code: 'MISSING_KIRO_IDC_START_URL',
+    });
+  });
+
+  it('rejects invalid IDC flow values before triggerOAuth is called', () => {
+    expect(
+      getKiroStartIDCValidationError({
+        kiroMethod: 'idc',
+        kiroIDCStartUrl: 'https://d-123.awsapps.com/start',
+        invalidKiroIDCFlow: true,
+      })
+    ).toEqual({
+      error: 'Invalid kiroIDCFlow. Supported: authcode, device',
+      code: 'INVALID_KIRO_IDC_FLOW',
+    });
+  });
+
+  it('allows valid IDC start payloads through', () => {
+    expect(
+      getKiroStartIDCValidationError({
+        kiroMethod: 'idc',
+        kiroIDCStartUrl: 'https://d-123.awsapps.com/start',
+        invalidKiroIDCFlow: false,
+      })
+    ).toBeNull();
   });
 });
 
@@ -42,6 +97,7 @@ describe('cliproxy-auth-routes start failure messaging', () => {
   it('keeps generic failure text for other providers', () => {
     expect(getStartAuthFailureMessage('gemini')).toBe('Authentication failed or was cancelled');
     expect(getStartAuthFailureMessage('kiro')).toBe('Authentication failed or was cancelled');
+    expect(getStartAuthFailureMessage('gitlab')).toBe('Authentication failed or was cancelled');
   });
 });
 

@@ -21,26 +21,67 @@ import {
   DEFAULT_CLIPROXY_SAFETY_CONFIG,
   DEFAULT_QUOTA_MANAGEMENT_CONFIG,
   DEFAULT_THINKING_CONFIG,
+  DEFAULT_OFFICIAL_CHANNELS_CONFIG,
   DEFAULT_DASHBOARD_AUTH_CONFIG,
+  DEFAULT_BROWSER_CONFIG,
   DEFAULT_IMAGE_ANALYSIS_CONFIG,
+  DEFAULT_LOGGING_CONFIG,
 } from './unified-config-types';
 import type {
   UnifiedConfig,
   CLIProxySafetyConfig,
   GlobalEnvConfig,
   ThinkingConfig,
+  OfficialChannelsConfig,
+  OfficialChannelId,
   DashboardAuthConfig,
+  BrowserConfig,
   ImageAnalysisConfig,
+  LoggingConfig,
   CursorConfig,
   ContinuityConfig,
 } from './unified-config-types';
 import { validateCompositeTiers } from '../cliproxy/composite-validator';
 import { isUnifiedConfigEnabled } from './feature-flags';
+import {
+  isOfficialChannelId,
+  normalizeOfficialChannelIds,
+  resolveLegacyDiscordSelection,
+} from '../channels/official-channels-runtime';
+import { getRecommendedBrowserUserDataDir } from '../utils/browser/browser-settings';
+import { canonicalizeImageAnalysisConfig } from '../utils/hooks/image-analysis-backend-resolver';
+import { normalizeSearxngBaseUrl } from '../utils/websearch/types';
 
 const CONFIG_YAML = 'config.yaml';
 const CONFIG_JSON = 'config.json';
 const CONFIG_LOCK = 'config.yaml.lock';
 const LOCK_STALE_MS = 5000; // Lock is stale after 5 seconds
+
+function normalizeBrowserDevtoolsPort(value: number | undefined): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_BROWSER_CONFIG.claude.devtools_port;
+  }
+
+  const port = Math.floor(value as number);
+  if (port < 1 || port > 65535) {
+    return DEFAULT_BROWSER_CONFIG.claude.devtools_port;
+  }
+
+  return port;
+}
+
+function canonicalizeBrowserConfig(config?: BrowserConfig): BrowserConfig {
+  return {
+    claude: {
+      enabled: config?.claude?.enabled ?? DEFAULT_BROWSER_CONFIG.claude.enabled,
+      user_data_dir: config?.claude?.user_data_dir?.trim() || getRecommendedBrowserUserDataDir(),
+      devtools_port: normalizeBrowserDevtoolsPort(config?.claude?.devtools_port),
+    },
+    codex: {
+      enabled: config?.codex?.enabled ?? DEFAULT_BROWSER_CONFIG.codex.enabled,
+    },
+  };
+}
 
 /**
  * Get path to unified config.yaml
@@ -71,10 +112,15 @@ function getLockFilePath(): string {
 
 function acquireLock(): string | null {
   const lockPath = getLockFilePath();
+  const lockDir = path.dirname(lockPath);
   const lockToken = crypto.randomUUID();
   const lockData = `${process.pid}\n${Date.now()}\n${lockToken}`;
 
   try {
+    if (!fs.existsSync(lockDir)) {
+      fs.mkdirSync(lockDir, { recursive: true, mode: 0o700 });
+    }
+
     // Check if lock exists
     if (fs.existsSync(lockPath)) {
       const content = fs.readFileSync(lockPath, 'utf8');
@@ -288,6 +334,36 @@ function normalizeContinuityConfig(partial: Partial<UnifiedConfig>): ContinuityC
   };
 }
 
+interface LegacyDiscordChannelsConfig {
+  enabled?: boolean;
+  unattended?: boolean;
+}
+
+function normalizeOfficialChannelsConfig(
+  partial: Partial<UnifiedConfig> & { discord_channels?: LegacyDiscordChannelsConfig }
+): OfficialChannelsConfig {
+  const hasCanonicalChannelsSection = partial.channels !== undefined;
+  const hasExplicitSelectedField =
+    hasCanonicalChannelsSection &&
+    Object.prototype.hasOwnProperty.call(partial.channels, 'selected');
+  const rawSelected =
+    hasExplicitSelectedField && Array.isArray(partial.channels?.selected)
+      ? partial.channels.selected.filter((value): value is OfficialChannelId =>
+          isOfficialChannelId(value)
+        )
+      : [];
+
+  return {
+    selected: hasCanonicalChannelsSection
+      ? normalizeOfficialChannelIds(rawSelected)
+      : resolveLegacyDiscordSelection(partial.discord_channels?.enabled),
+    unattended:
+      partial.channels?.unattended ??
+      partial.discord_channels?.unattended ??
+      DEFAULT_OFFICIAL_CHANNELS_CONFIG.unattended,
+  };
+}
+
 /**
  * Merge partial config with defaults.
  * Preserves existing data while filling in missing sections.
@@ -329,6 +405,34 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
           : undefined, // Invalid values become undefined (defaults to 'plus' at runtime)
       // Auto-sync - default to true
       auto_sync: partial.cliproxy?.auto_sync ?? defaults.cliproxy.auto_sync ?? true,
+      routing: {
+        strategy:
+          partial.cliproxy?.routing?.strategy === 'fill-first' ||
+          partial.cliproxy?.routing?.strategy === 'round-robin'
+            ? partial.cliproxy.routing.strategy
+            : defaults.cliproxy.routing?.strategy,
+      },
+    },
+    proxy: {
+      routing: {
+        default: partial.proxy?.routing?.default ?? defaults.proxy?.routing?.default,
+        background: partial.proxy?.routing?.background ?? defaults.proxy?.routing?.background,
+        think: partial.proxy?.routing?.think ?? defaults.proxy?.routing?.think,
+        longContext: partial.proxy?.routing?.longContext ?? defaults.proxy?.routing?.longContext,
+        webSearch: partial.proxy?.routing?.webSearch ?? defaults.proxy?.routing?.webSearch,
+        longContextThreshold:
+          partial.proxy?.routing?.longContextThreshold ??
+          defaults.proxy?.routing?.longContextThreshold,
+      },
+    },
+    logging: {
+      enabled: partial.logging?.enabled ?? DEFAULT_LOGGING_CONFIG.enabled,
+      level: partial.logging?.level ?? DEFAULT_LOGGING_CONFIG.level,
+      rotate_mb: partial.logging?.rotate_mb ?? DEFAULT_LOGGING_CONFIG.rotate_mb,
+      retain_days: partial.logging?.retain_days ?? DEFAULT_LOGGING_CONFIG.retain_days,
+      redact: partial.logging?.redact ?? DEFAULT_LOGGING_CONFIG.redact,
+      live_buffer_size:
+        partial.logging?.live_buffer_size ?? DEFAULT_LOGGING_CONFIG.live_buffer_size,
     },
     preferences: {
       ...defaults.preferences,
@@ -345,13 +449,18 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
           enabled: partial.websearch?.providers?.tavily?.enabled ?? false,
           max_results: partial.websearch?.providers?.tavily?.max_results ?? 5,
         },
-        duckduckgo: {
-          enabled: partial.websearch?.providers?.duckduckgo?.enabled ?? true,
-          max_results: partial.websearch?.providers?.duckduckgo?.max_results ?? 5,
-        },
         brave: {
           enabled: partial.websearch?.providers?.brave?.enabled ?? false,
           max_results: partial.websearch?.providers?.brave?.max_results ?? 5,
+        },
+        searxng: {
+          enabled: partial.websearch?.providers?.searxng?.enabled ?? false,
+          url: normalizeSearxngBaseUrl(partial.websearch?.providers?.searxng?.url) ?? '',
+          max_results: partial.websearch?.providers?.searxng?.max_results ?? 5,
+        },
+        duckduckgo: {
+          enabled: partial.websearch?.providers?.duckduckgo?.enabled ?? true,
+          max_results: partial.websearch?.providers?.duckduckgo?.max_results ?? 5,
         },
         gemini: {
           enabled:
@@ -499,6 +608,9 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
       provider_overrides: partial.thinking?.provider_overrides,
       show_warnings: partial.thinking?.show_warnings ?? DEFAULT_THINKING_CONFIG.show_warnings,
     },
+    channels: normalizeOfficialChannelsConfig(
+      partial as Partial<UnifiedConfig> & { discord_channels?: LegacyDiscordChannelsConfig }
+    ),
     // Dashboard auth config - disabled by default
     dashboard_auth: {
       enabled: partial.dashboard_auth?.enabled ?? DEFAULT_DASHBOARD_AUTH_CONFIG.enabled,
@@ -509,13 +621,18 @@ function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
         partial.dashboard_auth?.session_timeout_hours ??
         DEFAULT_DASHBOARD_AUTH_CONFIG.session_timeout_hours,
     },
+    browser: canonicalizeBrowserConfig(partial.browser),
     // Image analysis config - enabled by default for CLIProxy providers
-    image_analysis: {
+    image_analysis: canonicalizeImageAnalysisConfig({
       enabled: partial.image_analysis?.enabled ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.enabled,
       timeout: partial.image_analysis?.timeout ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.timeout,
       provider_models:
         partial.image_analysis?.provider_models ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.provider_models,
-    },
+      fallback_backend:
+        partial.image_analysis?.fallback_backend ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.fallback_backend,
+      profile_backends:
+        partial.image_analysis?.profile_backends ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.profile_backends,
+    }),
   };
 }
 
@@ -598,6 +715,30 @@ function generateYamlWithComments(config: UnifiedConfig): string {
     yaml.dump({ cliproxy: config.cliproxy }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
   );
   lines.push('');
+
+  if (config.proxy?.routing) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Proxy Routing: OpenAI-compatible local proxy model selection rules');
+    lines.push('# Use profile:model selectors to force a target profile and upstream model.');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml.dump({ proxy: config.proxy }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
+    );
+    lines.push('');
+  }
+
+  if (config.logging) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Logging: CCS-owned structured runtime logs');
+    lines.push('# Current file: ~/.ccs/logs/current.jsonl');
+    lines.push('# Archives rotate automatically and are pruned by retain_days.');
+    lines.push('# This is separate from cliproxy.logging, which controls CLIProxy runtime files.');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml.dump({ logging: config.logging }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
+    );
+    lines.push('');
+  }
 
   // CLIProxy Server section (remote proxy configuration) - placed right after cliproxy
   if (config.cliproxy_server) {
@@ -763,6 +904,28 @@ function generateYamlWithComments(config: UnifiedConfig): string {
     lines.push('');
   }
 
+  // Official Channels section
+  if (config.channels) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Official Channels: Runtime auto-enable for Anthropic official channel plugins');
+    lines.push('# Supported channels: telegram, discord, imessage');
+    lines.push('# Runtime-only: CCS injects --channels at launch for compatible Claude sessions.');
+    lines.push('# Bot tokens live in Claude channel env files, not in config.yaml.');
+    lines.push('# Use selected: [telegram, discord, imessage] to choose channels.');
+    lines.push(
+      '# unattended adds --dangerously-skip-permissions only when channel auto-enable is active.'
+    );
+    lines.push('# Compatible sessions: native Claude default/account profiles only.');
+    lines.push('# Configure via: ccs config channels or the Settings > Channels dashboard tab.');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml
+        .dump({ channels: config.channels }, { indent: 2, lineWidth: -1, quotingType: '"' })
+        .trim()
+    );
+    lines.push('');
+  }
+
   // Dashboard auth section (only if configured)
   if (config.dashboard_auth?.enabled) {
     lines.push('# ----------------------------------------------------------------------------');
@@ -779,6 +942,23 @@ function generateYamlWithComments(config: UnifiedConfig): string {
           { indent: 2, lineWidth: -1, quotingType: '"' }
         )
         .trim()
+    );
+    lines.push('');
+  }
+
+  // Browser automation section
+  if (config.browser) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Browser Automation: Claude browser attach and Codex browser tooling');
+    lines.push('# Claude attach reuses a running Chrome/Chromium session with remote debugging.');
+    lines.push('# Codex tooling controls whether CCS injects Playwright MCP overrides.');
+    lines.push('#');
+    lines.push('# claude.user_data_dir should point at the Chrome user-data directory for the');
+    lines.push('# dedicated attach session. claude.devtools_port is the expected debugging port.');
+    lines.push('# Configure via: Settings > Browser or `ccs browser ...`.');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml.dump({ browser: config.browser }, { indent: 2, lineWidth: -1, quotingType: '"' }).trim()
     );
     lines.push('');
   }
@@ -989,15 +1169,16 @@ export interface GeminiWebSearchInfo {
 /**
  * Get websearch configuration.
  * Returns defaults if not configured.
- * Supports Gemini CLI, OpenCode, and Grok CLI providers.
+ * Supports deterministic providers and optional Gemini/OpenCode/Grok CLI fallbacks.
  */
 export function getWebSearchConfig(): {
   enabled: boolean;
   providers?: {
     exa?: { enabled?: boolean; max_results?: number };
     tavily?: { enabled?: boolean; max_results?: number };
-    duckduckgo?: { enabled?: boolean; max_results?: number };
     brave?: { enabled?: boolean; max_results?: number };
+    searxng?: { enabled?: boolean; url?: string; max_results?: number };
+    duckduckgo?: { enabled?: boolean; max_results?: number };
     gemini?: GeminiWebSearchInfo;
     opencode?: { enabled?: boolean; model?: string; timeout?: number };
     grok?: { enabled?: boolean; timeout?: number };
@@ -1028,6 +1209,12 @@ export function getWebSearchConfig(): {
     max_results: config.websearch?.providers?.brave?.max_results ?? 5,
   };
 
+  const searxngConfig = {
+    enabled: config.websearch?.providers?.searxng?.enabled ?? false,
+    url: normalizeSearxngBaseUrl(config.websearch?.providers?.searxng?.url) ?? '',
+    max_results: config.websearch?.providers?.searxng?.max_results ?? 5,
+  };
+
   const geminiConfig: GeminiWebSearchInfo = {
     enabled:
       config.websearch?.providers?.gemini?.enabled ?? config.websearch?.gemini?.enabled ?? false,
@@ -1051,8 +1238,9 @@ export function getWebSearchConfig(): {
   const anyProviderEnabled =
     exaConfig.enabled ||
     tavilyConfig.enabled ||
-    duckDuckGoConfig.enabled ||
     braveConfig.enabled ||
+    searxngConfig.enabled ||
+    duckDuckGoConfig.enabled ||
     geminiConfig.enabled ||
     opencodeConfig.enabled ||
     grokConfig.enabled;
@@ -1063,8 +1251,9 @@ export function getWebSearchConfig(): {
     providers: {
       exa: exaConfig,
       tavily: tavilyConfig,
-      duckduckgo: duckDuckGoConfig,
       brave: braveConfig,
+      searxng: searxngConfig,
+      duckduckgo: duckDuckGoConfig,
       gemini: geminiConfig,
       opencode: opencodeConfig,
       grok: grokConfig,
@@ -1139,6 +1328,37 @@ export function getThinkingConfig(): ThinkingConfig {
 }
 
 /**
+ * Get Official Channels configuration.
+ * Returns defaults if not configured.
+ */
+export function getOfficialChannelsConfig(): OfficialChannelsConfig {
+  const config = loadOrCreateUnifiedConfig();
+
+  return {
+    selected:
+      config.channels?.selected && config.channels.selected.length > 0
+        ? normalizeOfficialChannelIds(config.channels.selected)
+        : DEFAULT_OFFICIAL_CHANNELS_CONFIG.selected,
+    unattended: config.channels?.unattended ?? DEFAULT_OFFICIAL_CHANNELS_CONFIG.unattended,
+  };
+}
+
+/**
+ * Get dashboard_auth configuration with ENV var override.
+ * Priority: ENV vars > config.yaml > defaults
+ */
+export function isDashboardAuthEnabled(): boolean {
+  const envEnabled = process.env.CCS_DASHBOARD_AUTH_ENABLED;
+
+  if (envEnabled !== undefined) {
+    return envEnabled === 'true' || envEnabled === '1';
+  }
+
+  const config = loadOrCreateUnifiedConfig();
+  return config.dashboard_auth?.enabled ?? false;
+}
+
+/**
  * Get dashboard_auth configuration with ENV var override.
  * Priority: ENV vars > config.yaml > defaults
  */
@@ -1162,17 +1382,43 @@ export function getDashboardAuthConfig(): DashboardAuthConfig {
 }
 
 /**
+ * Get browser automation configuration.
+ * Returns canonicalized defaults if not configured.
+ */
+export function getBrowserConfig(): BrowserConfig {
+  const config = loadOrCreateUnifiedConfig();
+  return canonicalizeBrowserConfig(config.browser);
+}
+
+/**
  * Get image_analysis configuration.
  * Returns defaults if not configured.
  */
 export function getImageAnalysisConfig(): ImageAnalysisConfig {
   const config = loadOrCreateUnifiedConfig();
 
-  return {
+  return canonicalizeImageAnalysisConfig({
     enabled: config.image_analysis?.enabled ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.enabled,
     timeout: config.image_analysis?.timeout ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.timeout,
     provider_models:
       config.image_analysis?.provider_models ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.provider_models,
+    fallback_backend:
+      config.image_analysis?.fallback_backend ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.fallback_backend,
+    profile_backends:
+      config.image_analysis?.profile_backends ?? DEFAULT_IMAGE_ANALYSIS_CONFIG.profile_backends,
+  });
+}
+
+export function getLoggingConfig(): LoggingConfig {
+  const config = loadOrCreateUnifiedConfig();
+
+  return {
+    enabled: config.logging?.enabled ?? DEFAULT_LOGGING_CONFIG.enabled,
+    level: config.logging?.level ?? DEFAULT_LOGGING_CONFIG.level,
+    rotate_mb: config.logging?.rotate_mb ?? DEFAULT_LOGGING_CONFIG.rotate_mb,
+    retain_days: config.logging?.retain_days ?? DEFAULT_LOGGING_CONFIG.retain_days,
+    redact: config.logging?.redact ?? DEFAULT_LOGGING_CONFIG.redact,
+    live_buffer_size: config.logging?.live_buffer_size ?? DEFAULT_LOGGING_CONFIG.live_buffer_size,
   };
 }
 

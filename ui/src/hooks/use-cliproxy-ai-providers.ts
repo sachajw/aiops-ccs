@@ -17,6 +17,7 @@ export function useCliproxyAiProviders() {
 
 export function useCreateCliproxyAiProviderEntry() {
   const queryClient = useQueryClient();
+  // TODO i18n: missing key for 'Provider entry created'
 
   return useMutation({
     mutationFn: ({
@@ -38,6 +39,7 @@ export function useCreateCliproxyAiProviderEntry() {
 
 export function useUpdateCliproxyAiProviderEntry() {
   const queryClient = useQueryClient();
+  // TODO i18n: missing key for 'Provider entry updated'
 
   return useMutation({
     mutationFn: ({
@@ -61,6 +63,7 @@ export function useUpdateCliproxyAiProviderEntry() {
 
 export function useDeleteCliproxyAiProviderEntry() {
   const queryClient = useQueryClient();
+  // TODO i18n: missing key for 'Provider entry removed'
 
   return useMutation({
     mutationFn: ({ family, entryId }: { family: AiProviderFamilyId; entryId: string }) =>

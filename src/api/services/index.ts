@@ -64,6 +64,12 @@ export {
 // OpenRouter catalog and picker
 export { isOpenRouterUrl, fetchOpenRouterModels, type OpenRouterModel } from './openrouter-catalog';
 export { pickOpenRouterModel, type OpenRouterSelection } from './openrouter-picker';
+export {
+  getLocalRuntimeReadiness,
+  type LocalRuntimeId,
+  type LocalRuntimeReadiness,
+  type LocalRuntimeStatus,
+} from './local-runtime-readiness';
 
 // Provider presets for CLI
 export {

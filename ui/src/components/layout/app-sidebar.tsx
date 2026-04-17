@@ -10,6 +10,7 @@ import {
   ChevronRight,
   BarChart3,
   Gauge,
+  ScrollText,
   Github,
   Puzzle,
   TerminalSquare,
@@ -102,7 +103,6 @@ function buildNavGroups(t: (key: string) => string): SidebarGroupDef[] {
           ],
         },
         { path: '/copilot', icon: Github, label: t('nav.githubCopilot') },
-        { path: '/cursor', iconSrc: '/assets/sidebar/cursor.svg', label: t('nav.cursorIde') },
         {
           path: '/accounts',
           icon: Users,
@@ -119,13 +119,25 @@ function buildNavGroups(t: (key: string) => string): SidebarGroupDef[] {
       title: t('nav.compatibleClis'),
       items: [
         { path: '/claude-extension', icon: Puzzle, label: t('nav.claudeExtension') },
+        { path: '/codex', iconSrc: '/assets/sidebar/codex.svg', label: 'Codex CLI' },
         { path: '/droid', icon: TerminalSquare, label: t('nav.factoryDroid') },
+      ],
+    },
+    {
+      title: t('nav.deprecated'),
+      items: [
+        {
+          path: '/legacy/cursor',
+          iconSrc: '/assets/sidebar/cursor.svg',
+          label: `${t('nav.cursorIde')} (Legacy)`,
+        },
       ],
     },
     {
       title: t('nav.system'),
       items: [
         { path: '/health', icon: Activity, label: t('nav.health') },
+        { path: '/logs', icon: ScrollText, label: t('nav.logs') },
         { path: '/settings', icon: Settings, label: t('nav.settings') },
       ],
     },

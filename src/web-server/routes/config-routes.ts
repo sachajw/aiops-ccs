@@ -673,6 +673,10 @@ router.put('/', (req: Request, res: Response): void => {
         currentConfig.cliproxy = mergeCliproxyConfig(currentConfig, config);
       }
 
+      if (config.proxy !== undefined) {
+        currentConfig.proxy = config.proxy;
+      }
+
       if (config.preferences !== undefined) {
         currentConfig.preferences = config.preferences;
       }

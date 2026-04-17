@@ -20,6 +20,7 @@ import { ProxyStatusWidget } from '@/components/monitoring/proxy-status-widget';
 import {
   useCliproxy,
   useCliproxyAuth,
+  useCliproxyCatalog,
   useCliproxyUpdateCheck,
   useSetDefaultAccount,
   useRemoveAccount,
@@ -31,7 +32,7 @@ import {
   useDeleteVariant,
 } from '@/hooks/use-cliproxy';
 import type { AuthStatus, Variant } from '@/lib/api-client';
-import { MODEL_CATALOGS } from '@/lib/model-catalogs';
+import { buildUiCatalogs } from '@/lib/model-catalogs';
 import { getProviderDisplayName, isValidProvider } from '@/lib/provider-config';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -209,6 +210,7 @@ export function CliproxyPage() {
   const queryClient = useQueryClient();
   const { data: authData, isLoading: authLoading } = useCliproxyAuth();
   const { data: variantsData, isFetching } = useCliproxy();
+  const { data: catalogData } = useCliproxyCatalog();
   const { data: updateCheck } = useCliproxyUpdateCheck();
   const setDefaultMutation = useSetDefaultAccount();
   const removeMutation = useRemoveAccount();
@@ -261,6 +263,9 @@ export function CliproxyPage() {
   const providers = useMemo(() => authData?.authStatus || [], [authData?.authStatus]);
   const isRemoteMode = authData?.source === 'remote';
   const variants = useMemo(() => variantsData?.variants || [], [variantsData?.variants]);
+  const catalogs = useMemo(() => buildUiCatalogs(catalogData?.catalogs), [catalogData?.catalogs]);
+  const routingHints = catalogData?.routing ?? {};
+  const fetchedCatalogsReady = Boolean(catalogData);
 
   // Wrapper to persist provider selection to localStorage
   const setSelectedProvider = (provider: string | null) => {
@@ -300,6 +305,8 @@ export function CliproxyPage() {
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['cliproxy'] });
     queryClient.invalidateQueries({ queryKey: ['cliproxy-auth'] });
+    queryClient.invalidateQueries({ queryKey: ['cliproxy-catalog'] });
+    queryClient.invalidateQueries({ queryKey: ['cliproxy-models'] });
   };
 
   const handlePauseToggle = (provider: string, accountId: string, paused: boolean) => {
@@ -443,11 +450,7 @@ export function CliproxyPage() {
       </div>
 
       {/* Right Panel */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background">
-        {showAccountSafetyWarning && (
-          <AccountSafetyWarningCard showProxySettingsLink className="mx-4 mt-4" />
-        )}
-
+      <div className="flex-1 flex min-w-0 flex-col overflow-hidden bg-background">
         {selectedVariantData && parentAuthForVariant ? (
           <>
             <ProviderEditor
@@ -457,12 +460,18 @@ export function CliproxyPage() {
                 provider: selectedVariantData.provider,
               })}
               authStatus={parentAuthForVariant}
-              catalog={MODEL_CATALOGS[selectedVariantData.provider]}
+              catalog={catalogs[selectedVariantData.provider]}
+              routing={routingHints[selectedVariantData.provider]}
               logoProvider={selectedVariantData.provider}
               baseProvider={selectedVariantData.provider}
               defaultTarget={selectedVariantData.target}
               isRemoteMode={isRemoteMode}
               port={selectedVariantData.port}
+              topNotice={
+                showAccountSafetyWarning ? (
+                  <AccountSafetyWarningCard compact showProxySettingsLink />
+                ) : undefined
+              }
               onAddAccount={() =>
                 setAddAccountProvider({
                   provider: selectedVariantData.provider,
@@ -505,8 +514,14 @@ export function CliproxyPage() {
               provider={selectedStatus.provider}
               displayName={selectedStatus.displayName}
               authStatus={selectedStatus}
-              catalog={MODEL_CATALOGS[selectedStatus.provider]}
+              catalog={catalogs[selectedStatus.provider]}
+              routing={routingHints[selectedStatus.provider]}
               isRemoteMode={isRemoteMode}
+              topNotice={
+                showAccountSafetyWarning ? (
+                  <AccountSafetyWarningCard compact showProxySettingsLink />
+                ) : undefined
+              }
               onAddAccount={() =>
                 setAddAccountProvider({
                   provider: selectedStatus.provider,
@@ -551,6 +566,11 @@ export function CliproxyPage() {
         onClose={() => setAddAccountProvider(null)}
         provider={addAccountProvider?.provider || ''}
         displayName={addAccountProvider?.displayName || ''}
+        catalog={
+          fetchedCatalogsReady && addAccountProvider?.provider
+            ? catalogs[addAccountProvider.provider]
+            : undefined
+        }
         isFirstAccount={addAccountProvider?.isFirstAccount || false}
       />
     </div>

@@ -122,6 +122,16 @@ describe('SearchableSelect', () => {
     });
   });
 
+  it('renders options inside a native overflow container so wheel scrolling works', async () => {
+    render(<SearchableSelectHarness />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Select model' }));
+
+    const scrollContainer = await screen.findByTestId('searchable-select-scroll-container');
+    expect(scrollContainer).toHaveClass('max-h-72');
+    expect(scrollContainer).toHaveClass('overflow-y-auto');
+  });
+
   it('opens from the trigger with arrow keys', async () => {
     render(<SearchableSelectHarness />);
 

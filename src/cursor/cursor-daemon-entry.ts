@@ -248,7 +248,7 @@ export function startCursorDaemonServer(options: DaemonRuntimeOptions): http.Ser
 
       const authStatus = checkAuthStatus();
       if (!authStatus.authenticated || !authStatus.credentials) {
-        const message = 'Cursor credentials not found. Run `ccs cursor auth` first.';
+        const message = 'Cursor credentials not found. Run `ccs legacy cursor auth` first.';
         if (isAnthropicRoute) {
           await pipeWebResponseToNode(
             createAnthropicErrorResponse(401, 'authentication_error', message),
@@ -266,7 +266,7 @@ export function startCursorDaemonServer(options: DaemonRuntimeOptions): http.Ser
       }
 
       if (authStatus.expired) {
-        const message = 'Cursor credentials expired. Run `ccs cursor auth` again.';
+        const message = 'Cursor credentials expired. Run `ccs legacy cursor auth` again.';
         if (isAnthropicRoute) {
           await pipeWebResponseToNode(
             createAnthropicErrorResponse(401, 'authentication_error', message),

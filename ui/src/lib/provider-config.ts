@@ -9,19 +9,18 @@ import {
   PROVIDER_CAPABILITIES,
   getProvidersByOAuthFlow,
 } from '../../../src/cliproxy/provider-capabilities';
-import type { AiProviderFamilyId } from '../../../src/cliproxy/ai-providers';
+import type { AiProviderFamilyId, AiProviderModelAlias } from '../../../src/cliproxy/ai-providers';
+import i18n from './i18n';
 
 // Monorepo contract: UI consumes provider capability constants directly from backend
 // to enforce one source of truth and prevent provider drift across surfaces.
 
 /** Canonical list of CLIProxy provider IDs (shared with backend). */
 export const CLIPROXY_PROVIDERS = CLIPROXY_PROVIDER_IDS;
-
-/** Union type for CLIProxy provider IDs */
 export type CLIProxyProvider = (typeof CLIPROXY_PROVIDERS)[number];
 export type ProviderVisualId = CLIProxyProvider | 'openai' | 'vertex';
 
-/** Check if a string is a valid CLIProxy provider */
+/** Check if a string is a backend-supported CLIProxy provider. */
 export function isValidProvider(provider: string): provider is CLIProxyProvider {
   return CLIPROXY_PROVIDERS.includes(provider as CLIProxyProvider);
 }
@@ -37,9 +36,13 @@ interface ProviderMetadata {
 
 const SPECIAL_PROVIDER_VISUAL_IDS = ['openai', 'vertex'] as const;
 
+function isPresentationProvider(provider: string): provider is CLIProxyProvider {
+  return isValidProvider(provider);
+}
+
 function isProviderVisualId(provider: string): provider is ProviderVisualId {
   return (
-    isValidProvider(provider) ||
+    isPresentationProvider(provider) ||
     SPECIAL_PROVIDER_VISUAL_IDS.includes(provider as (typeof SPECIAL_PROVIDER_VISUAL_IDS)[number])
   );
 }
@@ -64,6 +67,10 @@ export const PROVIDER_ASSETS: Partial<Record<ProviderVisualId, string>> = {
   qwen: '/assets/providers/qwen-color.svg',
   iflow: '/assets/providers/iflow.png',
   kiro: '/assets/providers/kiro.png',
+  cursor: '/assets/sidebar/cursor.svg',
+  gitlab: '/assets/providers/gitlab.svg',
+  codebuddy: '/assets/providers/codebuddy.png',
+  kilo: '/assets/providers/kilo.png',
   ghcp: '/assets/providers/copilot.svg',
   claude: '/assets/providers/claude.svg',
   kimi: '/assets/providers/kimi.svg',
@@ -90,6 +97,10 @@ export const PROVIDER_FALLBACK_VISUALS: Record<ProviderVisualId, ProviderFallbac
   qwen: { textClass: 'text-cyan-600', letter: 'Q' },
   iflow: { textClass: 'text-indigo-600', letter: 'i' },
   kiro: { textClass: 'text-teal-600', letter: 'K' },
+  cursor: { textClass: 'text-slate-900', letter: 'C' },
+  gitlab: { textClass: 'text-orange-600', letter: 'G' },
+  codebuddy: { textClass: 'text-blue-600', letter: 'B' },
+  kilo: { textClass: 'text-rose-600', letter: 'K' },
   ghcp: { textClass: 'text-green-600', letter: 'C' },
   kimi: { textClass: 'text-orange-500', letter: 'K' },
   openai: { textClass: 'text-slate-900', letter: 'O' },
@@ -113,6 +124,75 @@ export function getAiProviderFamilyVisual(familyId: AiProviderFamilyId): Provide
     case 'openai-compatibility':
       return 'openai';
   }
+}
+
+/**
+ * Parse UI model rules that use the requested=upstream convention into the
+ * provider config shape where `name` is upstream and `alias` is client-visible.
+ */
+export function parseRequestedUpstreamModelRules(value: string): AiProviderModelAlias[] {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const separatorIndex = line.indexOf('=');
+      if (separatorIndex === -1) {
+        return { name: line.trim(), alias: '' };
+      }
+
+      const requested = line.slice(0, separatorIndex).trim();
+      const upstream = line.slice(separatorIndex + 1).trim();
+      if (!upstream) {
+        return { name: requested, alias: '' };
+      }
+
+      return {
+        name: upstream,
+        alias: requested,
+      };
+    })
+    .filter((item) => item.name.length > 0 || item.alias.length > 0);
+}
+
+export function getRequestedUpstreamModelRuleErrors(value: string): string[] {
+  return value
+    .split('\n')
+    .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+    .filter(({ line }) => line.length > 0 && line.includes('='))
+    .flatMap(({ line, lineNumber }) => {
+      const separatorIndex = line.indexOf('=');
+      const requested = line.slice(0, separatorIndex).trim();
+      const upstream = line.slice(separatorIndex + 1).trim();
+      if (requested && upstream) {
+        return [];
+      }
+
+      return [`Line ${lineNumber}: use requested=upstream or a plain model name.`];
+    });
+}
+
+/**
+ * Format stored provider config back into the UI-facing requested=upstream form.
+ */
+export function formatRequestedUpstreamModelRules(
+  models: Array<Partial<AiProviderModelAlias>> | null | undefined
+): string {
+  return (models || [])
+    .map((item) => {
+      const requested = item.alias?.trim() || '';
+      const upstream = item.name?.trim() || '';
+      return requested ? `${requested}=${upstream}` : upstream;
+    })
+    .join('\n');
+}
+
+/**
+ * Return the client-visible model ID for previews and generated settings.
+ */
+export function getRequestedModelId(model: AiProviderModelAlias): string {
+  const requested = model.alias.trim();
+  return requested || model.name.trim();
 }
 
 export function getProviderLogoAsset(provider: unknown): string | undefined {
@@ -154,6 +234,10 @@ export const PROVIDER_COLORS: Record<string, string> = {
   iflow: '#f94144',
   qwen: '#6236FF',
   kiro: '#4d908e',
+  cursor: '#111827',
+  gitlab: '#FC6D26',
+  codebuddy: '#2563EB',
+  kilo: '#E11D48',
   ghcp: '#43aa8b',
   claude: '#D97757',
   kimi: '#FF6B35',
@@ -170,15 +254,15 @@ const PROVIDER_NAMES: Record<string, string> = {
 export function getProviderDisplayName(provider: unknown): string {
   const normalized = normalizeProviderInput(provider);
   if (!normalized) {
-    return 'Unknown provider';
+    return i18n.t('toasts.providerUnknown', { provider: 'unknown' });
   }
-  return PROVIDER_NAMES[normalized] || String(provider);
+  return PROVIDER_NAMES[normalized] || i18n.t('toasts.providerUnknown', { provider: normalized });
 }
 
 /** Map provider to user-facing short description */
 export function getProviderDescription(provider: unknown): string {
   const normalized = normalizeProviderInput(provider);
-  if (!isValidProvider(normalized)) return '';
+  if (!isPresentationProvider(normalized)) return '';
   return PROVIDER_METADATA[normalized].description;
 }
 
@@ -214,12 +298,12 @@ export function isDeviceCodeProvider(provider: unknown): boolean {
 export function getDeviceCodeProviderDisplayName(provider: unknown): string {
   const normalized = normalizeProviderInput(provider);
   if (!normalized) {
-    return 'Unknown provider';
+    return i18n.t('toasts.providerUnknown', { provider: 'unknown' });
   }
   if (isValidProvider(normalized)) {
     return DEVICE_CODE_PROVIDER_DISPLAY_NAMES[normalized] || getProviderDisplayName(normalized);
   }
-  return String(provider);
+  return i18n.t('toasts.providerUnknown', { provider: normalized });
 }
 
 /** Provider-specific helper text for device-code dialog. */
@@ -227,15 +311,19 @@ export function getDeviceCodeProviderInstruction(provider: unknown): string {
   const normalized = normalizeProviderInput(provider);
   if (isValidProvider(normalized)) {
     return (
-      DEVICE_CODE_PROVIDER_INSTRUCTIONS[normalized] || 'Complete the authorization in your browser.'
+      DEVICE_CODE_PROVIDER_INSTRUCTIONS[normalized] ||
+      i18n.t('providerConfig.defaultDeviceCodeInstruction')
     );
   }
-  return 'Complete the authorization in your browser.';
+  return i18n.t('providerConfig.defaultDeviceCodeInstruction');
 }
 
 /** Kiro auth methods exposed in CCS UI (aligned with CLIProxyAPIPlus support). */
-export const KIRO_AUTH_METHODS = ['aws', 'aws-authcode', 'google', 'github'] as const;
+export const KIRO_AUTH_METHODS = ['aws', 'aws-authcode', 'google', 'github', 'idc'] as const;
 export type KiroAuthMethod = (typeof KIRO_AUTH_METHODS)[number];
+export const KIRO_IDC_FLOWS = ['authcode', 'device'] as const;
+export type KiroIDCFlow = (typeof KIRO_IDC_FLOWS)[number];
+export const DEFAULT_KIRO_IDC_FLOW: KiroIDCFlow = 'authcode';
 
 export type KiroFlowType = 'authorization_code' | 'device_code';
 export type KiroStartEndpoint = 'start' | 'start-url';
@@ -254,31 +342,38 @@ export const DEFAULT_KIRO_AUTH_METHOD: KiroAuthMethod = 'aws';
 export const KIRO_AUTH_METHOD_OPTIONS: readonly KiroAuthMethodOption[] = [
   {
     id: 'aws',
-    label: 'AWS Builder ID (Recommended)',
-    description: 'Device code flow for AWS organizations and Builder ID accounts.',
+    label: 'AWS Builder ID (Recommended)', // TODO i18n: missing key for kiro auth method aws
+    description: 'Device code flow for AWS organizations and Builder ID accounts.', // TODO i18n: missing key
     flowType: 'device_code',
     startEndpoint: 'start',
   },
   {
     id: 'aws-authcode',
-    label: 'AWS Builder ID (Auth Code)',
-    description: 'Authorization code flow via CLI binary.',
+    label: 'AWS Builder ID (Auth Code)', // TODO i18n: missing key
+    description: 'Authorization code flow via CLI binary.', // TODO i18n: missing key
     flowType: 'authorization_code',
     startEndpoint: 'start',
   },
   {
     id: 'google',
-    label: 'Google OAuth',
-    description: 'Social OAuth flow with callback URL support.',
+    label: 'Google OAuth', // TODO i18n: missing key
+    description: 'Social OAuth flow with callback URL support.', // TODO i18n: missing key
     flowType: 'authorization_code',
     startEndpoint: 'start-url',
   },
   {
     id: 'github',
-    label: 'GitHub OAuth',
-    description: 'Social OAuth flow via management API callback.',
+    label: 'GitHub OAuth', // TODO i18n: missing key
+    description: 'Social OAuth flow via management API callback.', // TODO i18n: missing key
     flowType: 'authorization_code',
     startEndpoint: 'start-url',
+  },
+  {
+    id: 'idc',
+    label: 'AWS Identity Center (IDC)', // TODO i18n: missing key
+    description: 'Use your organization start URL with auth code or device flow.', // TODO i18n: missing key
+    flowType: 'authorization_code',
+    startEndpoint: 'start',
   },
 ];
 
@@ -292,7 +387,40 @@ export function normalizeKiroAuthMethod(value?: string): KiroAuthMethod {
   return isKiroAuthMethod(normalized) ? normalized : DEFAULT_KIRO_AUTH_METHOD;
 }
 
+export function isKiroIDCFlow(value: string): value is KiroIDCFlow {
+  return KIRO_IDC_FLOWS.includes(value as KiroIDCFlow);
+}
+
+export function normalizeKiroIDCFlow(value?: string): KiroIDCFlow {
+  if (!value) return DEFAULT_KIRO_IDC_FLOW;
+  const normalized = value.trim().toLowerCase();
+  return isKiroIDCFlow(normalized) ? normalized : DEFAULT_KIRO_IDC_FLOW;
+}
+
 export function getKiroAuthMethodOption(method: KiroAuthMethod): KiroAuthMethodOption {
   const option = KIRO_AUTH_METHOD_OPTIONS.find((candidate) => candidate.id === method);
   return option || KIRO_AUTH_METHOD_OPTIONS[0];
+}
+
+export function getKiroEffectiveFlowType(
+  method: KiroAuthMethod,
+  idcFlow: KiroIDCFlow = DEFAULT_KIRO_IDC_FLOW
+): KiroFlowType {
+  if (method === 'aws') {
+    return 'device_code';
+  }
+
+  if (method === 'idc') {
+    return normalizeKiroIDCFlow(idcFlow) === 'device' ? 'device_code' : 'authorization_code';
+  }
+
+  return 'authorization_code';
+}
+
+export function getKiroEffectiveStartEndpoint(method: KiroAuthMethod): KiroStartEndpoint {
+  return method === 'google' || method === 'github' ? 'start-url' : 'start';
+}
+
+export function isKiroSocialAuthMethod(method: KiroAuthMethod): boolean {
+  return method === 'google' || method === 'github';
 }

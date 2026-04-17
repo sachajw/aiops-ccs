@@ -1,15 +1,15 @@
 import { getDefaultAccount } from './account-manager';
 import { getProviderCatalog } from './model-catalog';
+import { normalizeModelIdForProvider } from './model-id-normalizer';
 import { fetchCodexQuota } from './quota-fetcher-codex';
 import { getCachedQuota, setCachedQuota } from './quota-response-cache';
 import type { CodexQuotaResult } from './quota-types';
-import { updateSettingsModel } from './services/variant-settings';
 import { info, warn } from '../utils/ui';
 
 export type CodexPlanType = CodexQuotaResult['planType'];
 
-const FREE_SAFE_DEFAULT_MODEL = 'gpt-5-codex';
-const FREE_SAFE_FAST_MODEL = 'gpt-5-codex-mini';
+const FREE_SAFE_DEFAULT_MODEL = 'gpt-5.4';
+const FREE_SAFE_FAST_MODEL = 'gpt-5.4-mini';
 const CODEX_EFFORT_SUFFIX_REGEX = /-(xhigh|high|medium)$/i;
 const CODEX_PAREN_SUFFIX_REGEX = /\((xhigh|high|medium)\)$/i;
 const EXTENDED_CONTEXT_SUFFIX_REGEX = /\[1m\]$/i;
@@ -20,7 +20,6 @@ const KNOWN_CODEX_MODELS = new Set(
 const FREE_PLAN_FALLBACKS = new Map<string, string>([
   ['gpt-5.3-codex', FREE_SAFE_DEFAULT_MODEL],
   ['gpt-5.3-codex-spark', FREE_SAFE_FAST_MODEL],
-  ['gpt-5.4', FREE_SAFE_DEFAULT_MODEL],
 ]);
 
 export interface CodexRuntimeFallbackModelMap {
@@ -37,6 +36,13 @@ export interface CodexUnsupportedModelError {
   type: string | null;
 }
 
+interface CodexPlanCompatibilityDeps {
+  getDefaultAccount?: typeof getDefaultAccount;
+  fetchCodexQuota?: typeof fetchCodexQuota;
+  formatInfo?: typeof info;
+  formatWarn?: typeof warn;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -46,13 +52,13 @@ function isKnownCodexModel(model: string): boolean {
 }
 
 export function normalizeCodexModelId(model: string): string {
-  return model
+  const stripped = model
     .trim()
     .replace(EXTENDED_CONTEXT_SUFFIX_REGEX, '')
     .replace(CODEX_PAREN_SUFFIX_REGEX, '')
     .replace(CODEX_EFFORT_SUFFIX_REGEX, '')
-    .trim()
-    .toLowerCase();
+    .trim();
+  return normalizeModelIdForProvider(stripped, 'codex').trim().toLowerCase();
 }
 
 export function getDefaultCodexModel(): string {
@@ -131,21 +137,28 @@ export function resolveRuntimeCodexFallbackModel(options: {
   return null;
 }
 
-export async function reconcileCodexModelForActivePlan(options: {
-  settingsPath: string;
-  currentModel: string | undefined;
-  verbose: boolean;
-}): Promise<void> {
-  const { settingsPath, currentModel, verbose } = options;
+export async function reconcileCodexModelForActivePlan(
+  options: {
+    currentModel: string | undefined;
+    verbose: boolean;
+  },
+  deps: CodexPlanCompatibilityDeps = {}
+): Promise<void> {
+  const { currentModel, verbose } = options;
   if (!currentModel) return;
 
   const fallbackModel = getFreePlanFallbackCodexModel(currentModel);
   if (!fallbackModel) return;
 
-  const defaultAccount = getDefaultAccount('codex');
+  const resolveDefaultAccount = deps.getDefaultAccount ?? getDefaultAccount;
+  const fetchQuota = deps.fetchCodexQuota ?? fetchCodexQuota;
+  const formatInfo = deps.formatInfo ?? info;
+  const formatWarn = deps.formatWarn ?? warn;
+
+  const defaultAccount = resolveDefaultAccount('codex');
   if (!defaultAccount) {
     console.error(
-      warn(
+      formatWarn(
         `Configured Codex model "${normalizeCodexModelId(currentModel)}" may require a paid Codex plan. ` +
           `If startup fails, switch to "${fallbackModel}" with "ccs codex --config".`
       )
@@ -154,19 +167,16 @@ export async function reconcileCodexModelForActivePlan(options: {
   }
 
   const cachedQuota = getCachedQuota<CodexQuotaResult>('codex', defaultAccount.id);
-  const quota = cachedQuota ?? (await fetchCodexQuota(defaultAccount.id, verbose));
+  const quota = cachedQuota ?? (await fetchQuota(defaultAccount.id, verbose));
   if (!cachedQuota) {
     setCachedQuota('codex', defaultAccount.id, quota);
   }
 
   if (quota.planType === 'free') {
-    updateSettingsModel(settingsPath, fallbackModel, 'codex', {
-      rewriteHaikuModel: (haikuModel) => getFreePlanFallbackCodexModel(haikuModel) ?? haikuModel,
-    });
     console.error(
-      info(
-        `Codex free plan detected. Switched unsupported model "${normalizeCodexModelId(currentModel)}" ` +
-          `to "${fallbackModel}".`
+      formatInfo(
+        `Codex free plan detected. Keeping saved model "${normalizeCodexModelId(currentModel)}" in settings; ` +
+          `runtime requests will fall back to "${fallbackModel}" when needed.`
       )
     );
     return;
@@ -177,7 +187,7 @@ export async function reconcileCodexModelForActivePlan(options: {
   }
 
   console.error(
-    warn(
+    formatWarn(
       `Could not verify Codex plan for model "${normalizeCodexModelId(currentModel)}". ` +
         `If startup fails with model_not_supported, switch to "${fallbackModel}" via "ccs codex --config".`
     )

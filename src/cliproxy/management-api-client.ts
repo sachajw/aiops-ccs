@@ -16,6 +16,7 @@ import type {
   GetModelDefinitionsResponse,
 } from './management-api-types';
 import { CLIPROXY_DEFAULT_PORT } from './config/port-manager';
+import type { CliproxyRoutingStrategy } from './types';
 
 /** Default timeout for management operations (longer than health check) */
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -225,6 +226,22 @@ export class ManagementApiClient {
       `/v0/management/model-definitions/${encodedChannel}`
     );
     return response.data?.models ?? [];
+  }
+
+  /**
+   * Get the global credential routing strategy from CLIProxy.
+   */
+  async getRoutingStrategy(): Promise<CliproxyRoutingStrategy> {
+    const response = await this.request<{ strategy?: string }>('GET', '/routing/strategy');
+    return response.data?.strategy === 'fill-first' ? 'fill-first' : 'round-robin';
+  }
+
+  /**
+   * Update the global credential routing strategy on CLIProxy.
+   */
+  async putRoutingStrategy(strategy: CliproxyRoutingStrategy): Promise<CliproxyRoutingStrategy> {
+    await this.request('PUT', '/routing/strategy', { value: strategy });
+    return strategy;
   }
 
   /**

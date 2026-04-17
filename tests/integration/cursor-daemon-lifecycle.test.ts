@@ -74,7 +74,7 @@ describe('cursor daemon lifecycle smoke', () => {
     };
     expect(anthropicBody.type).toBe('error');
     expect(anthropicBody.error?.type).toBe('authentication_error');
-    expect(anthropicBody.error?.message).toContain('Run `ccs cursor auth` first');
+    expect(anthropicBody.error?.message).toContain('Run `ccs legacy cursor auth` first');
 
     const stopResult = await stopDaemon();
     expect(stopResult.success).toBe(true);

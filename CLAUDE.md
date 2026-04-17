@@ -17,7 +17,25 @@ Tests set `process.env.CCS_HOME` to a temp directory. Code using `os.homedir()` 
 
 ## Core Function
 
-CLI wrapper for instant switching between multiple provider accounts and alternative models (GLM, Kimi, and other API profiles). See README.md for user documentation.
+Multi-provider profile and runtime manager for Claude Code, Factory Droid,
+Codex CLI, and other compatible targets. See README.md for user documentation.
+
+## README Preservation
+
+When editing `README.md`, keep the file concise and funnel detailed usage into
+the docs site, but **do not remove the `## Community Projects` section** or the
+`## Star History` section unless the user explicitly asks for those sections to
+be deleted. Treat both as protected README content.
+
+When a contributor adds a useful community integration section to `README.md`,
+prefer preserving the attribution in `## Community Projects` and moving the
+setup substance into a docs page, rather than deleting the contribution.
+
+Outside provider-specific Gemini and Antigravity docs, avoid using `ccs gemini`
+or `ccs agy` as the primary hero example, default starter route, or generic
+workflow example. Prefer `ccs`, `ccs codex`, `ccs kiro`, `ccs glm`, Droid
+examples, or neutral `ccs <provider>` placeholders when the page is about a
+broader topic.
 
 ## Design Principles (ENFORCE STRICTLY)
 
@@ -50,6 +68,110 @@ CLI wrapper for instant switching between multiple provider accounts and alterna
 | Forgetting `--help` update | CLI docs out of sync | Update `src/commands/help-command.ts` |
 | Forgetting docs update | User docs out of sync | Update `docs/` and CCS docs submodule |
 
+## GitHub Issue Operations (CCS-Specific)
+
+These rules apply when the task is issue triage, backlog cleanup, labels, comments, Projects, or milestones for this repo.
+
+### Scope Boundary
+
+- Treat issue triage as a **GitHub-only workflow** unless the user explicitly asks for implementation.
+- Do **NOT** create a worktree, branch, PR, or run `/fix`, `/cook`, or `kai:maintainer` just to tag issues, post follow-up comments, close duplicates, or clean up backlog state.
+- Escalate into code workflow only when:
+  - the user explicitly asks to fix/implement an issue, or
+  - triage proves the same task now requires code changes.
+
+### Read Before Mutating
+
+- Always inspect live issue state first with `gh issue view <n> --json ...` or `gh api`.
+- Never rely on stale memory, screenshots, or issue titles alone.
+- Before closing as resolved, cross-check repo evidence in at least one of:
+  - `README.md`
+  - `docs/`
+  - `CHANGELOG.md`
+  - relevant source/help handlers
+- If the `gh` query would touch Projects fields, verify token scope first. Missing `read:project` is a real blocker, not something to hand-wave around.
+
+### Labeling Standard
+
+- Every **open** issue should end triage with:
+  - one primary type label: `bug`, `enhancement`, `question`, `documentation`, `duplicate`, `invalid`, or `wontfix`
+  - one area label:
+    - `area:cli-runtime`
+    - `area:dashboard-ui`
+    - `area:config-auth`
+    - `area:provider-integration`
+    - `area:install-packaging`
+    - `area:documentation`
+    - `area:contributor-workflow`
+- Add routing labels only when they materially change handling:
+  - `upstream-blocked`
+  - `needs-repro`
+  - `needs-split`
+  - `docs-gap`
+- Use release-state labels for shipped work:
+  - `pending-release`
+  - `released-dev`
+  - `released`
+- Do **NOT** create or use status labels like `todo`, `doing`, `blocked`, `done`.
+- Do **NOT** create provider-name labels unless there is a proven long-term need. Provider names belong in titles/issues, not label spam.
+
+### Commenting Rules
+
+- Keep issue comments short, technical, and neutral.
+- State the decision plainly: close, keep open, retag, needs repro, duplicate, blocked upstream.
+- Include exact evidence when relevant: version, doc path, changelog release, canonical issue, upstream link.
+- Do **NOT** reference internal plans, local report files, agent prompts, or private reasoning.
+- Post **one** maintainer follow-up comment per triage pass. If accidental duplicates are created, delete them with `gh api repos/<owner>/<repo>/issues/comments/<id> -X DELETE`.
+
+### Closure Rules
+
+- Close immediately when:
+  - the issue is an obvious duplicate and you can point to the canonical issue
+  - the feature/fix is clearly shipped and documented
+  - a previously `pending-release` issue is now clearly past release and no longer needs tracking
+- Keep open and retag when:
+  - upstream dependency still blocks CCS adoption -> `upstream-blocked`
+  - latest-release behavior is unclear -> `needs-repro`
+  - issue contains multiple independent asks -> `needs-split`
+  - feature likely exists but discoverability/docs are weak -> `docs-gap`
+- Do **NOT** close just because an issue is old, vague, or inconvenient. Close only with evidence.
+
+### Projects And Milestones
+
+- Preferred project model for this repo: one project, `CCS Backlog`.
+- Use Projects for workflow state and priority. Use labels for meaning and routing.
+- Milestones are for real ship windows only, not generic categorization buckets.
+- If `gh` token lacks `read:project`, say so explicitly and stop short of pretending Projects data is available.
+- Active project:
+  - owner: `kaitranntt`
+  - number: `3`
+  - URL: `https://github.com/users/kaitranntt/projects/3`
+- Active project fields:
+  - `Status` -> use for work state (`Todo`, `In Progress`, `Done`)
+  - `Priority` -> `P1` for bugs, `P2` default backlog, `P3` for broad `needs-split` buckets unless explicitly reprioritized
+  - `Follow-up` -> `Ready`, `Needs repro`, `Blocked upstream`, `Needs split`, `Docs follow-up`
+  - `Next review` -> date only for issues that need a follow-up checkpoint
+- When triaging an open issue, make sure it exists in `CCS Backlog` and the project fields match the routing labels.
+- Do **NOT** create a second backlog project unless the user explicitly wants a project split and gives a reason.
+- Current automation path:
+  - workflow file: `.github/workflows/sync-ccs-backlog-project.yml`
+  - sync script: `scripts/github/ccs-backlog-sync.mjs`
+  - required Actions secret: `CCS_PROJECT_AUTOMATION_TOKEN`
+- Automation mapping must stay aligned with labels:
+  - `upstream-blocked` -> `Follow-up=Blocked upstream`
+  - `needs-repro` -> `Follow-up=Needs repro`
+  - `needs-split` -> `Follow-up=Needs split`
+  - `docs-gap` -> `Follow-up=Docs follow-up`
+  - otherwise -> `Follow-up=Ready`
+
+### New Or Updated Issue Creation
+
+- When creating issues for this repo:
+  - assign `@kaitranntt`
+  - use conventional issue titles: `bug: ...`, `feat: ...`, `docs: ...`
+  - keep bodies factual and technical
+  - avoid personal info and internal-only context
+
 ## Quality Gates (MANDATORY)
 
 Quality gates MUST pass before pushing. **Both projects have identical workflow.**
@@ -61,7 +183,7 @@ Quality gates MUST pass before pushing. **Both projects have identical workflow.
 bun run format              # Step 1: Fix formatting
 bun run lint:fix            # Step 2: Fix lint issues
 bun run validate            # Step 3: Full gate (typecheck + lint + format + maintainability + tests)
-bun run validate:ci-parity  # Step 4: CI parity gate (build + validate + base branch check)
+bun run validate:ci-parity  # Step 4: full CI parity gate (build + validate + base branch check)
 
 # UI project (if UI changed)
 cd ui
@@ -108,7 +230,8 @@ bun run validate            # Step 3: Final check (must pass)
 - `prepublishOnly` / `prepack` runs `build:all` + `validate` + `sync-version.js`
 - CI/CD runs `bun run validate` on every PR (maintainability is warning mode on PR events)
 - husky `pre-commit` runs quick lint/type/format checks
-- husky `pre-push` runs `bun run validate:ci-parity` to block CI drift before push
+- husky `pre-push` runs the full `bun run validate:ci-parity` gate on `main`/`dev`/hotfix branches
+- husky `pre-push` runs a faster feature-branch gate (`typecheck` + `lint:fix` + `format:check` + targeted checks based on changed files) before GitHub CI handles the full matrix
 
 ### Maintainability Baseline Gate
 
@@ -156,6 +279,7 @@ bun run validate            # Step 3: Final check (must pass)
 | `ccs copilot --help` | `src/commands/copilot-command.ts` → `handleHelp()` |
 | `ccs cursor --help` | `src/commands/cursor-command.ts` → `handleHelp()` |
 | `ccs doctor --help` | `src/commands/doctor-command.ts` → `showHelp()` |
+| `ccs docker --help` | `src/commands/docker/help-subcommand.ts` → `showHelp()` |
 | `ccs migrate --help` | `src/commands/migrate-command.ts` → `printMigrateHelp()` |
 | `ccs env --help` | `src/commands/env-command.ts` → `showHelp()` |
 | `ccs persist --help` | `src/commands/persist-command.ts` → `showHelp()` |
@@ -430,7 +554,7 @@ bun run build             # Build for production
 **Quality (BLOCKERS):**
 - [ ] `bun run format` — formatting fixed
 - [ ] `bun run validate` — all checks pass
-- [ ] `bun run validate:ci-parity` — CI parity passed (also enforced by pre-push hook)
+- [ ] `bun run validate:ci-parity` — CI parity passed (required before protected-branch pushes; recommended before PRs)
 - [ ] `cd ui && bun run format && bun run validate` — if UI changed
 - [ ] If touching debt-sensitive code, run `bun run maintainability:check:strict` before opening/merging PR
 - [ ] If strict mode fails and increase is intentional: `bun run maintainability:baseline` and commit `docs/metrics/maintainability-baseline.json`

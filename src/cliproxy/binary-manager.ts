@@ -62,6 +62,8 @@ function createDefaultConfig(backend: CLIProxyBackend = DEFAULT_BACKEND): Binary
     maxRetries: 3,
     verbose: false,
     forceVersion: false,
+    skipAutoUpdate: false,
+    allowInstall: true,
     backend, // Pass backend for installer to use correct download URL
   };
 }
@@ -115,8 +117,16 @@ export class BinaryManager {
   }
 }
 
+export interface EnsureCLIProxyBinaryOptions {
+  allowInstall?: boolean;
+  skipAutoUpdate?: boolean;
+}
+
 /** Convenience function respecting version pin */
-export async function ensureCLIProxyBinary(verbose = false): Promise<string> {
+export async function ensureCLIProxyBinary(
+  verbose = false,
+  options: EnsureCLIProxyBinaryOptions = {}
+): Promise<string> {
   const backend = getConfiguredBackend();
 
   // Migrate old shared pin to backend-specific location (one-time migration)
@@ -130,11 +140,20 @@ export async function ensureCLIProxyBinary(verbose = false): Promise<string> {
         version: pinnedVersion,
         verbose,
         forceVersion: true,
+        skipAutoUpdate: options.skipAutoUpdate ?? false,
+        allowInstall: options.allowInstall ?? true,
       },
       backend
     ).ensureBinary();
   }
-  return new BinaryManager({ verbose }, backend).ensureBinary();
+  return new BinaryManager(
+    {
+      verbose,
+      skipAutoUpdate: options.skipAutoUpdate ?? false,
+      allowInstall: options.allowInstall ?? true,
+    },
+    backend
+  ).ensureBinary();
 }
 
 /** Check if CLIProxyAPI binary is installed */
@@ -158,41 +177,61 @@ export function getInstalledCliproxyVersion(backend?: CLIProxyBackend): string {
   );
 }
 
+interface InstallCliproxyVersionDeps {
+  createManager?: (
+    config: Partial<BinaryManagerConfig>,
+    backend: CLIProxyBackend
+  ) => Pick<BinaryManager, 'isBinaryInstalled' | 'deleteBinary' | 'ensureBinary'>;
+  stopProxyFn?: typeof stopProxy;
+  waitForPortFreeFn?: typeof waitForPortFree;
+  formatInfo?: typeof info;
+  formatWarn?: typeof warn;
+  getInstalledVersion?: typeof getInstalledCliproxyVersion;
+}
+
 /** Install a specific version of CLIProxyAPI */
 export async function installCliproxyVersion(
   version: string,
   verbose = false,
-  backend?: CLIProxyBackend
+  backend?: CLIProxyBackend,
+  deps: InstallCliproxyVersionDeps = {}
 ): Promise<void> {
   const effectiveBackend = backend ?? getConfiguredBackend();
-  const manager = new BinaryManager({ version, verbose, forceVersion: true }, effectiveBackend);
+  const manager =
+    deps.createManager?.({ version, verbose, forceVersion: true }, effectiveBackend) ??
+    new BinaryManager({ version, verbose, forceVersion: true }, effectiveBackend);
+  const stopProxyFn = deps.stopProxyFn ?? stopProxy;
+  const waitForPortFreeFn = deps.waitForPortFreeFn ?? waitForPortFree;
+  const formatInfo = deps.formatInfo ?? info;
+  const formatWarn = deps.formatWarn ?? warn;
+  const getInstalledVersion = deps.getInstalledVersion ?? getInstalledCliproxyVersion;
 
   // Always attempt a best-effort stop first so we also catch untracked proxies
   // that are running without a session lock.
-  if (verbose) console.log(info('Stopping running CLIProxy before update...'));
-  const result = await stopProxy();
+  if (verbose) console.log(formatInfo('Stopping running CLIProxy before update...'));
+  const result = await stopProxyFn();
   if (result.stopped) {
     // Wait for port to be fully released
-    const portFree = await waitForPortFree(CLIPROXY_DEFAULT_PORT, 5000);
+    const portFree = await waitForPortFreeFn(CLIPROXY_DEFAULT_PORT, 5000);
     if (!portFree && verbose) {
-      console.log(warn('Port did not free up in time, proceeding anyway...'));
+      console.log(formatWarn('Port did not free up in time, proceeding anyway...'));
     }
   } else if (verbose && result.error && result.error !== 'No active CLIProxy session found') {
-    console.log(warn(`Could not stop proxy: ${result.error}`));
+    console.log(formatWarn(`Could not stop proxy: ${result.error}`));
   }
 
   if (manager.isBinaryInstalled()) {
     const label = effectiveBackend === 'plus' ? 'CLIProxy Plus' : 'CLIProxy';
     if (verbose)
       console.log(
-        info(`Removing existing ${label} v${getInstalledCliproxyVersion(effectiveBackend)}`)
+        formatInfo(`Removing existing ${label} v${getInstalledVersion(effectiveBackend)}`)
       );
     manager.deleteBinary();
   }
   await manager.ensureBinary();
 
   if (verbose) {
-    console.log(info('New version will be active on next CLIProxy command'));
+    console.log(formatInfo('New version will be active on next CLIProxy command'));
   }
 }
 

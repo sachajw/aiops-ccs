@@ -10,6 +10,7 @@ import { Info, Shield } from 'lucide-react';
 import { UsageCommand } from './usage-command';
 import type { SettingsResponse } from './types';
 import type { AuthStatus, CliTarget } from '@/lib/api-client';
+import { useTranslation } from 'react-i18next';
 
 interface ProviderInfoTabProps {
   provider: string;
@@ -17,6 +18,7 @@ interface ProviderInfoTabProps {
   defaultTarget?: CliTarget;
   data?: SettingsResponse;
   authStatus: AuthStatus;
+  supportsModelConfig?: boolean;
 }
 
 export function ProviderInfoTab({
@@ -25,9 +27,17 @@ export function ProviderInfoTab({
   defaultTarget,
   data,
   authStatus,
+  supportsModelConfig = false,
 }: ProviderInfoTabProps) {
+  const { t } = useTranslation();
   const resolvedTarget = defaultTarget || 'claude';
   const isDroidTarget = resolvedTarget === 'droid';
+  const isCodexProvider = provider === 'codex';
+  const managementPrefix =
+    resolvedTarget === 'claude' ? `ccs ${provider}` : `ccs ${provider} --target claude`;
+  const changeModelCommand = `${managementPrefix} --config`;
+  const addAccountCommand = `${managementPrefix} --auth --add`;
+  const listAccountsCommand = `${managementPrefix} --accounts`;
 
   return (
     <ScrollArea className="h-full">
@@ -36,17 +46,22 @@ export function ProviderInfoTab({
         <div>
           <h3 className="text-sm font-medium flex items-center gap-2 mb-3">
             <Info className="w-4 h-4" />
+            {/* TODO i18n: missing key for "Provider Information" */}
             Provider Information
           </h3>
           <div className="space-y-3 bg-card rounded-lg border p-4 shadow-sm">
             <div className="grid grid-cols-[100px_1fr] gap-2 text-sm items-center">
-              <span className="font-medium text-muted-foreground">Provider</span>
+              <span className="font-medium text-muted-foreground">
+                {t('providerEditor.provider')}
+              </span>
               <span className="font-mono">{displayName}</span>
             </div>
             {data && (
               <>
                 <div className="grid grid-cols-[100px_1fr] gap-2 text-sm items-center">
-                  <span className="font-medium text-muted-foreground">File Path</span>
+                  <span className="font-medium text-muted-foreground">
+                    {t('providerEditor.filePath')}
+                  </span>
                   <div className="flex items-center gap-2 min-w-0">
                     <code className="bg-muted px-1.5 py-0.5 rounded text-xs break-all">
                       {data.path}
@@ -55,13 +70,17 @@ export function ProviderInfoTab({
                   </div>
                 </div>
                 <div className="grid grid-cols-[100px_1fr] gap-2 text-sm items-center">
-                  <span className="font-medium text-muted-foreground">Last Modified</span>
+                  <span className="font-medium text-muted-foreground">
+                    {t('providerEditor.lastModified')}
+                  </span>
                   <span className="text-xs">{new Date(data.mtime).toLocaleString()}</span>
                 </div>
               </>
             )}
             <div className="grid grid-cols-[100px_1fr] gap-2 text-sm items-center">
-              <span className="font-medium text-muted-foreground">Status</span>
+              <span className="font-medium text-muted-foreground">
+                {t('providerEditor.status')}
+              </span>
               {authStatus.authenticated ? (
                 <Badge
                   variant="outline"
@@ -77,7 +96,9 @@ export function ProviderInfoTab({
               )}
             </div>
             <div className="grid grid-cols-[100px_1fr] gap-2 text-sm items-center">
-              <span className="font-medium text-muted-foreground">Default Target</span>
+              <span className="font-medium text-muted-foreground">
+                {t('providerEditor.defaultTarget')}
+              </span>
               <span className="font-mono">{resolvedTarget}</span>
             </div>
           </div>
@@ -85,9 +106,21 @@ export function ProviderInfoTab({
 
         {/* Quick Usage */}
         <div>
-          <h3 className="text-sm font-medium mb-3">Quick Usage</h3>
+          <h3 className="text-sm font-medium mb-3">{t('providerEditor.quickUsage')}</h3>
           <div className="space-y-3 bg-card rounded-lg border p-4 shadow-sm">
             <UsageCommand label="Run with prompt" command={`ccs ${provider} "your prompt"`} />
+            {isCodexProvider && (
+              <>
+                <UsageCommand
+                  label="Run on native Codex (shortcut)"
+                  command={`ccsxp "your prompt"`}
+                />
+                <UsageCommand
+                  label="Run on native Codex (--target)"
+                  command={`ccs ${provider} --target codex "your prompt"`}
+                />
+              </>
+            )}
             <UsageCommand
               label={isDroidTarget ? 'Droid alias (explicit)' : 'Run on Droid'}
               command={`ccs-droid ${provider} "your prompt"`}
@@ -96,9 +129,30 @@ export function ProviderInfoTab({
               label={isDroidTarget ? 'Override to Claude' : 'Run on Droid (--target)'}
               command={`ccs ${provider} --target ${isDroidTarget ? 'claude' : 'droid'} "your prompt"`}
             />
-            <UsageCommand label="Change model" command={`ccs ${provider} --config`} />
-            <UsageCommand label="Add account" command={`ccs ${provider} --add`} />
-            <UsageCommand label="List accounts" command={`ccs ${provider} --accounts`} />
+            {supportsModelConfig && (
+              <UsageCommand
+                label={
+                  resolvedTarget === 'claude' ? 'Change model' : 'Change model (Claude target)'
+                }
+                command={changeModelCommand}
+              />
+            )}
+            <UsageCommand
+              label={resolvedTarget === 'claude' ? 'Add account' : 'Add account (Claude target)'}
+              command={addAccountCommand}
+            />
+            <UsageCommand
+              label={
+                resolvedTarget === 'claude' ? 'List accounts' : 'List accounts (Claude target)'
+              }
+              command={listAccountsCommand}
+            />
+            {resolvedTarget !== 'claude' && (
+              <p className="text-xs text-muted-foreground">
+                Account and model-management flags stay on Claude target. Codex and Droid runtime
+                launches reject those CLIProxy management commands.
+              </p>
+            )}
           </div>
         </div>
       </div>

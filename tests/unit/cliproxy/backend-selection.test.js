@@ -121,6 +121,13 @@ describe('Backend Selection', () => {
       assert(types.PLUS_ONLY_PROVIDERS.includes('ghcp'));
     });
 
+    it('includes the newer CLIProxyAPIPlus providers as plus-only', () => {
+      assert(types.PLUS_ONLY_PROVIDERS.includes('cursor'));
+      assert(types.PLUS_ONLY_PROVIDERS.includes('gitlab'));
+      assert(types.PLUS_ONLY_PROVIDERS.includes('codebuddy'));
+      assert(types.PLUS_ONLY_PROVIDERS.includes('kilo'));
+    });
+
     it('does not include gemini as plus-only provider', () => {
       assert(!types.PLUS_ONLY_PROVIDERS.includes('gemini'));
     });

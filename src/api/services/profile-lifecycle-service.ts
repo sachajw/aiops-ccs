@@ -8,8 +8,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Config, Settings } from '../../types';
 import type { TargetType } from '../../targets/target-adapter';
+import { getPersistedTargetChoices, isPersistedTargetType } from '../../targets/target-metadata';
 import { getCcsDir, getConfigPath, loadConfigSafe } from '../../utils/config-manager';
-import { ensureProfileHooks } from '../../utils/websearch/profile-hook-injector';
+import { ensureWebSearchMcpOrThrow } from '../../utils/websearch-manager';
+import { ensureImageAnalysisMcpOrThrow } from '../../utils/image-analysis';
 import { isSensitiveKey } from '../../utils/sensitive-keys';
 import { isReservedName } from '../../config/reserved-names';
 import { isUnifiedMode, mutateUnifiedConfig } from '../../config/unified-config-loader';
@@ -29,7 +31,7 @@ const SETTINGS_FILE_SUFFIX = '.settings.json';
 const REDACTED_TOKEN_SENTINEL = '__CCS_REDACTED__';
 
 function parseTargetValue(value: unknown): TargetType | null {
-  if (value === 'claude' || value === 'droid') {
+  if (isPersistedTargetType(value)) {
     return value;
   }
   return null;
@@ -216,8 +218,11 @@ export function registerApiProfileOrphans(options?: {
     }
 
     try {
+      if (orphan.validation.valid) {
+        ensureWebSearchMcpOrThrow();
+        ensureImageAnalysisMcpOrThrow();
+      }
       registerApiProfileInConfig(orphan.name, options?.target || 'claude', options?.force || false);
-      ensureProfileHooks(orphan.name);
       result.registered.push(orphan.name);
     } catch (error) {
       result.skipped.push({ name: orphan.name, reason: (error as Error).message });
@@ -264,7 +269,13 @@ export function copyApiProfile(
       : null;
 
     writeJsonObjectAtomically(destinationSettingsPath, sourceSettings);
-    ensureProfileHooks(destination);
+    try {
+      ensureWebSearchMcpOrThrow();
+      ensureImageAnalysisMcpOrThrow();
+    } catch (hookError) {
+      rollbackSettingsFile(destinationSettingsPath, previousDestinationContent, destinationExisted);
+      throw hookError;
+    }
     try {
       registerApiProfileInConfig(
         destination,
@@ -352,7 +363,7 @@ export function importApiProfileBundle(
   if (input.profile.target !== undefined && bundleTarget === null) {
     return {
       success: false,
-      error: 'Invalid bundle profile target. Expected: claude or droid.',
+      error: `Invalid bundle profile target. Expected: ${getPersistedTargetChoices()}.`,
     };
   }
 
@@ -384,7 +395,13 @@ export function importApiProfileBundle(
     const previousSettingsContent = settingsExisted ? fs.readFileSync(settingsPath, 'utf8') : null;
 
     writeJsonObjectAtomically(settingsPath, settings);
-    ensureProfileHooks(name);
+    try {
+      ensureWebSearchMcpOrThrow();
+      ensureImageAnalysisMcpOrThrow();
+    } catch (hookError) {
+      rollbackSettingsFile(settingsPath, previousSettingsContent, settingsExisted);
+      throw hookError;
+    }
     try {
       registerApiProfileInConfig(name, options?.target || bundleTarget || 'claude', options?.force);
     } catch (registrationError) {

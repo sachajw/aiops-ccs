@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
+function stripAnsi(input: string): string {
+  return input.replace(/\u001b\[[0-9;]*m/g, '');
+}
+
 let calls: string[] = [];
 let logLines: string[] = [];
 let originalConsoleLog: typeof console.log;
@@ -14,20 +18,6 @@ beforeEach(() => {
   console.log = (...args: unknown[]) => {
     logLines.push(args.map(String).join(' '));
   };
-
-  const uiModule = {
-    initUI: async () => {},
-    header: (message: string) => message,
-    subheader: (message: string) => message,
-    color: (message: string) => message,
-    dim: (message: string) => message,
-    ok: (message: string) => message,
-    info: (message: string) => message,
-    warn: (message: string) => message,
-    fail: (message: string) => message,
-  };
-  mock.module('../../../src/utils/ui', () => uiModule);
-  mock.module('../../../src/utils/ui.ts', () => uiModule);
 
   mock.module('../../../src/commands/config-auth/setup-command', () => ({
     handleSetup: async () => {
@@ -55,9 +45,7 @@ afterEach(() => {
 });
 
 async function loadHandleConfigAuthCommand() {
-  const mod = await import(
-    `../../../src/commands/config-auth?test=${Date.now()}-${Math.random()}`
-  );
+  const mod = await import(`../../../src/commands/config-auth?test=${Date.now()}-${Math.random()}`);
   return mod.handleConfigAuthCommand;
 }
 
@@ -76,7 +64,7 @@ describe('config-auth command routing', () => {
     await handleConfigAuthCommand(['--help']);
 
     expect(calls).toEqual([]);
-    expect(logLines.join('\n')).toContain('Dashboard Auth Management');
+    expect(stripAnsi(logLines.join('\n'))).toContain('Dashboard Auth Management');
   });
 
   it('rejects trailing arguments for zero-arg subcommands', async () => {

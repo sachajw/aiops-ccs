@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ProviderLogo } from '@/components/cliproxy/provider-logo';
-import { getAiProviderFamilyVisual } from '@/lib/provider-config';
+import {
+  formatRequestedUpstreamModelRules,
+  getAiProviderFamilyVisual,
+  getRequestedUpstreamModelRuleErrors,
+  parseRequestedUpstreamModelRules,
+} from '@/lib/provider-config';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -16,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { ChevronDown, KeyRound, SlidersHorizontal } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type {
   AiProviderEntryView,
   AiProviderFamilyId,
@@ -192,22 +198,7 @@ function parseKeyValueLines(value: string): Array<{ key: string; value: string }
 }
 
 function parseModelAliasLines(value: string) {
-  return value
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      const separatorIndex = line.indexOf('=');
-      if (separatorIndex === -1) {
-        return { name: line.trim(), alias: '' };
-      }
-
-      return {
-        name: line.slice(0, separatorIndex).trim(),
-        alias: line.slice(separatorIndex + 1).trim(),
-      };
-    })
-    .filter((item) => item.name.length > 0 || item.alias.length > 0);
+  return parseRequestedUpstreamModelRules(value);
 }
 
 function TextArea({
@@ -241,9 +232,7 @@ function formatExcludedModels(entry?: AiProviderEntryView | null): string {
 }
 
 function formatModelAliases(entry?: AiProviderEntryView | null): string {
-  return (entry?.models || [])
-    .map((item) => (item.alias.trim() ? `${item.name}=${item.alias}` : item.name))
-    .join('\n');
+  return formatRequestedUpstreamModelRules(entry?.models);
 }
 
 function ChecklistCard({
@@ -283,6 +272,7 @@ export function ProviderEntryDialog({
   onSubmit,
   isSaving,
 }: ProviderEntryDialogProps) {
+  const { t } = useTranslation();
   const guide = useMemo(() => getDialogGuide(family), [family]);
   const isEditing = Boolean(entry);
   const supportsOpenAiCompat = family === 'openai-compatibility';
@@ -297,6 +287,10 @@ export function ProviderEntryDialog({
   const [headers, setHeaders] = useState(() => formatHeaders(entry));
   const [excludedModels, setExcludedModels] = useState(() => formatExcludedModels(entry));
   const [modelAliases, setModelAliases] = useState(() => formatModelAliases(entry));
+  const modelRuleErrors = useMemo(
+    () => getRequestedUpstreamModelRuleErrors(modelAliases),
+    [modelAliases]
+  );
   const [advancedOpen, setAdvancedOpen] = useState(() =>
     Boolean(
       entry?.headers.length || entry?.excludedModels.length || entry?.proxyUrl || entry?.prefix
@@ -311,6 +305,10 @@ export function ProviderEntryDialog({
   }, [entry?.secretConfigured, isEditing, supportsOpenAiCompat]);
 
   const handleSubmit = async () => {
+    if (modelRuleErrors.length > 0) {
+      return;
+    }
+
     const nextApiKey = apiKey.trim();
     const nextApiKeys = parseDelimitedLines(apiKeys);
     const preserveSecrets =
@@ -386,7 +384,9 @@ export function ProviderEntryDialog({
           <div className="space-y-6 px-6 py-6">
             <section className="space-y-4">
               <div>
-                <div className="text-sm font-semibold">Required setup</div>
+                <div className="text-sm font-semibold">
+                  {t('aiProvidersEntryDialog.requiredSetup')}
+                </div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   Save the smallest working configuration first.
                 </div>
@@ -395,7 +395,9 @@ export function ProviderEntryDialog({
               {supportsOpenAiCompat ? (
                 <div className="grid gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="connector-name">Connector Name</Label>
+                    <Label htmlFor="connector-name">
+                      {t('aiProvidersEntryDialog.connectorName')}
+                    </Label>
                     <Input
                       id="connector-name"
                       value={name}
@@ -444,7 +446,9 @@ export function ProviderEntryDialog({
 
             <section className="space-y-4">
               <div>
-                <div className="text-sm font-semibold">Optional routing</div>
+                <div className="text-sm font-semibold">
+                  {t('aiProvidersEntryDialog.optionalRouting')}
+                </div>
                 <div className="mt-1 text-sm text-muted-foreground">
                   Only fill these when the route needs more than the default behavior.
                 </div>
@@ -472,6 +476,9 @@ export function ProviderEntryDialog({
                   placeholder={guide.aliasesPlaceholder}
                 />
                 <p className="text-xs text-muted-foreground">{guide.aliasesHelper}</p>
+                {modelRuleErrors.length > 0 ? (
+                  <p className="text-xs text-destructive">{modelRuleErrors[0]}</p>
+                ) : null}
               </div>
             </section>
 
@@ -573,7 +580,11 @@ export function ProviderEntryDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="button" onClick={() => void handleSubmit()} disabled={isSaving}>
+            <Button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={isSaving || modelRuleErrors.length > 0}
+            >
               {isSaving
                 ? 'Saving...'
                 : supportsOpenAiCompat

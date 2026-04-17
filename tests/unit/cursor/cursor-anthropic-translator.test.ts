@@ -281,7 +281,7 @@ describe('createAnthropicProxyResponse', () => {
     };
     expect(body.type).toBe('error');
     expect(body.error?.type).toBe('api_error');
-    expect(body.error?.message).toBe('Failed to translate Cursor JSON response');
+    expect(body.error?.message).toBe('Failed to translate OpenAI-compatible JSON response');
   });
 
   it('returns 502 when Cursor response is missing choices', async () => {
@@ -305,7 +305,7 @@ describe('createAnthropicProxyResponse', () => {
     };
     expect(body.type).toBe('error');
     expect(body.error?.type).toBe('api_error');
-    expect(body.error?.message).toBe('Failed to translate Cursor JSON response');
+    expect(body.error?.message).toBe('Failed to translate OpenAI-compatible JSON response');
   });
 
   it('returns 502 when Cursor response has empty choices', async () => {
@@ -330,7 +330,7 @@ describe('createAnthropicProxyResponse', () => {
     };
     expect(body.type).toBe('error');
     expect(body.error?.type).toBe('api_error');
-    expect(body.error?.message).toBe('Failed to translate Cursor JSON response');
+    expect(body.error?.message).toBe('Failed to translate OpenAI-compatible JSON response');
   });
 
   it('returns Anthropic error envelopes for non-OK upstream JSON errors', async () => {
@@ -382,7 +382,7 @@ describe('createAnthropicProxyResponse', () => {
     };
     expect(body.type).toBe('error');
     expect(body.error?.type).toBe('api_error');
-    expect(body.error?.message).toBe('Failed to translate Cursor JSON response');
+    expect(body.error?.message).toBe('Failed to translate OpenAI-compatible JSON response');
   });
 
   it('converts OpenAI SSE chunks into Anthropic SSE events', async () => {
@@ -420,7 +420,7 @@ describe('createAnthropicProxyResponse', () => {
     expect(body).toContain('event: error');
     expect(body).toContain('"type":"error"');
     expect(body).toContain('"error":{"type":"api_error"');
-    expect(body).toContain('Failed to translate Cursor SSE response');
+    expect(body).toContain('Failed to translate OpenAI-compatible SSE response');
   });
 
   it('emits Anthropic-style error events when SSE JSON is malformed', async () => {
@@ -435,6 +435,6 @@ describe('createAnthropicProxyResponse', () => {
     expect(body).toContain('event: error');
     expect(body).toContain('"type":"error"');
     expect(body).toContain('"error":{"type":"api_error"');
-    expect(body).toContain('Failed to translate Cursor SSE response');
+    expect(body).toContain('Failed to translate OpenAI-compatible SSE response');
   });
 });

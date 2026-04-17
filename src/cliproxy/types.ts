@@ -50,6 +50,10 @@ export interface BinaryManagerConfig {
   verbose: boolean;
   /** Force specific version (skip auto-upgrade to latest) */
   forceVersion: boolean;
+  /** Skip background update checks on runtime bootstrap paths */
+  skipAutoUpdate: boolean;
+  /** Allow downloading/installing the binary when it is missing */
+  allowInstall: boolean;
   /** Backend variant (original vs plus) */
   backend?: CLIProxyBackend;
 }
@@ -122,6 +126,10 @@ export interface DownloadResult {
  * - ghcp: GitHub Copilot via Device Code (OAuth through CLIProxyAPIPlus)
  * - claude: Claude (Anthropic) via OAuth
  * - kimi: Kimi (Moonshot AI) via Device Code OAuth
+ * - cursor: Cursor via PKCE browser polling
+ * - gitlab: GitLab Duo via OAuth or PAT
+ * - codebuddy: Tencent CodeBuddy via browser polling
+ * - kilo: Kilo AI via device flow
  */
 export type CLIProxyProvider =
   | 'gemini'
@@ -132,19 +140,35 @@ export type CLIProxyProvider =
   | 'kiro'
   | 'ghcp'
   | 'claude'
-  | 'kimi';
+  | 'kimi'
+  | 'cursor'
+  | 'gitlab'
+  | 'codebuddy'
+  | 'kilo';
 
 /**
  * CLIProxy backend selection
- * - original: CLIProxyAPI (no Kiro/ghcp support)
- * - plus: CLIProxyAPIPlus (Kiro/ghcp support, default)
+ * - original: CLIProxyAPI (legacy provider subset)
+ * - plus: CLIProxyAPIPlus (expanded provider support, default)
  */
 export type CLIProxyBackend = 'original' | 'plus';
 
 /**
+ * Credential routing strategy for matching CLIProxy accounts.
+ */
+export type CliproxyRoutingStrategy = 'round-robin' | 'fill-first';
+
+/**
  * Providers that require CLIProxyAPIPlus backend
  */
-export const PLUS_ONLY_PROVIDERS: CLIProxyProvider[] = ['kiro', 'ghcp'];
+export const PLUS_ONLY_PROVIDERS: CLIProxyProvider[] = [
+  'kiro',
+  'ghcp',
+  'cursor',
+  'gitlab',
+  'codebuddy',
+  'kilo',
+];
 
 /**
  * CLIProxy config.yaml structure (minimal)
@@ -154,6 +178,9 @@ export interface CLIProxyConfig {
   'api-keys': string[];
   'auth-dir': string;
   debug: boolean;
+  routing?: {
+    strategy?: CliproxyRoutingStrategy;
+  };
   'gemini-api-key'?: Array<{
     'api-key': string;
     'base-url'?: string;
@@ -221,6 +248,8 @@ export interface ExecutorConfig {
   profileName?: string;
   /** Optional inherited continuity directory from mapped account profile */
   claudeConfigDir?: string;
+  /** Optional browser runtime env for Claude browser MCP reuse. */
+  browserRuntimeEnv?: Record<string, string>;
 }
 
 /**
@@ -268,6 +297,8 @@ export interface ResolvedProxyConfig {
   protocol: 'http' | 'https';
   /** Auth token for remote proxy authentication */
   authToken?: string;
+  /** Management key for remote management endpoints */
+  managementKey?: string;
   /** Enable fallback to local when remote unreachable (default: true) */
   fallbackEnabled: boolean;
   /** Auto-start local proxy if not running (default: true) */

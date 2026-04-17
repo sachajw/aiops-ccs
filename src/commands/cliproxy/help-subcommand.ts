@@ -36,9 +36,10 @@ export async function showHelp(): Promise<void> {
     [
       'Catalog Commands:',
       [
-        ['catalog', 'Show catalog status (cached vs static)'],
+        ['catalog', 'Show catalog status, routing hints, and pinned short prefixes'],
         ['catalog refresh', 'Sync models from remote CLIProxy'],
         ['catalog reset', 'Clear cache, revert to static catalog'],
+        ['catalog --json', 'Output full model catalog as minified JSON'],
       ],
     ],
     [
@@ -57,6 +58,9 @@ export async function showHelp(): Promise<void> {
         ['resume <account>', 'Resume paused account'],
         ['quota', 'Show quota status for all providers (Codex/Claude include 5h + weekly reset)'],
         ['quota --provider <name>', `Filter by provider (${QUOTA_PROVIDER_HELP_TEXT})`],
+        ['routing', 'Show current routing strategy and manual guidance'],
+        ['routing explain', 'Explain round-robin vs fill-first'],
+        ['routing set <mode>', 'Explicitly set round-robin or fill-first'],
       ],
     ],
     [
@@ -82,7 +86,7 @@ export async function showHelp(): Promise<void> {
       [
         ['--backend <type>', 'Use specific backend: original | plus (default: from config)'],
         ['--target <cli>', 'Default target for created/edited variants: claude | droid'],
-        ['--verbose, -v', 'Show detailed quota fetch diagnostics'],
+        ['--verbose, -v', 'Show detailed diagnostics including routing hints and quota fetches'],
       ],
     ],
   ];
@@ -97,6 +101,7 @@ export async function showHelp(): Promise<void> {
   }
 
   console.log(dim('  Note: CLIProxy now persists by default. Use "stop" to terminate.'));
+  console.log(dim('  Routing: use gcli/<model> or agy/<model> to keep overlapping models pinned.'));
   console.log('');
   console.log(subheader('Notes:'));
   console.log(`  Default fallback version: ${color(getFallbackVersion(), 'info')}`);

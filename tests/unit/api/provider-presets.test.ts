@@ -73,6 +73,25 @@ describe('provider-presets', () => {
     expect(preset?.defaultProfileName).toBe('qwen-api');
   });
 
+  it('resolves Hugging Face preset metadata', () => {
+    const preset = getPresetById('huggingface');
+    expect(preset?.id).toBe('huggingface');
+    expect(preset?.baseUrl).toBe('https://router.huggingface.co/v1');
+    expect(preset?.defaultProfileName).toBe('hf');
+    expect(preset?.defaultModel).toBe('openai/gpt-oss-120b:fastest');
+    expect(preset?.defaultTarget).toBe('droid');
+    expect(preset?.apiKeyPlaceholder).toBe('hf_...');
+  });
+
+  it('resolves hf alias to the Hugging Face preset', () => {
+    const preset = getPresetById('hf');
+    expect(preset?.id).toBe('huggingface');
+  });
+
+  it('treats hf alias as a valid preset id', () => {
+    expect(isValidPresetId('hf')).toBe(true);
+  });
+
   it('keeps Anthropic direct last in the recommended preset order and reuses the Claude logo', () => {
     const recommendedPresetIds = PROVIDER_PRESETS.filter(
       (preset) => preset.category === 'recommended'

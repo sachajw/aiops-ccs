@@ -32,6 +32,13 @@ describe('provider preset metadata', () => {
     expect(getPresetById('glmt')?.id).toBe('glm');
   });
 
+  it('maps hf alias to the Hugging Face preset', () => {
+    const preset = getPresetById('hf');
+    expect(preset?.id).toBe('huggingface');
+    expect(preset?.baseUrl).toBe('https://router.huggingface.co/v1');
+    expect(preset?.defaultTarget).toBe('droid');
+  });
+
   it('uses the llama.cpp provider logo asset for the local llama.cpp preset', () => {
     expect(getPresetById('llamacpp')?.icon).toBe('/assets/providers/llama-cpp.svg');
   });

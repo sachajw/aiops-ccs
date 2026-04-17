@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 export interface SearchableSelectGroup {
   key: string;
@@ -280,7 +279,11 @@ export function SearchableSelect({
           </div>
         </div>
 
-        <ScrollArea className="max-h-72">
+        <div
+          data-slot="searchable-select-scroll-container"
+          data-testid="searchable-select-scroll-container"
+          className="max-h-72 overflow-y-auto overscroll-contain"
+        >
           {filteredOptions.length === 0 ? (
             <div className="px-3 py-6 text-center text-sm text-muted-foreground">{emptyText}</div>
           ) : (
@@ -331,7 +334,7 @@ export function SearchableSelect({
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );

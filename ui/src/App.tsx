@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { queryClient } from '@/lib/query-client';
@@ -34,7 +34,9 @@ const CursorPage = lazy(() => import('@/pages/cursor').then((m) => ({ default: m
 const ClaudeExtensionPage = lazy(() =>
   import('@/pages/claude-extension').then((m) => ({ default: m.ClaudeExtensionPage }))
 );
+const CodexPage = lazy(() => import('@/pages/codex').then((m) => ({ default: m.CodexPage })));
 const DroidPage = lazy(() => import('@/pages/droid').then((m) => ({ default: m.DroidPage })));
+const LogsPage = lazy(() => import('@/pages/logs').then((m) => ({ default: m.LogsPage })));
 const AccountsPage = lazy(() =>
   import('@/pages/accounts').then((m) => ({ default: m.AccountsPage }))
 );
@@ -127,6 +129,10 @@ export default function App() {
                     />
                     <Route
                       path="/cursor"
+                      element={<Navigate to="/cliproxy?provider=cursor" replace />}
+                    />
+                    <Route
+                      path="/legacy/cursor"
                       element={
                         <Suspense fallback={<PageLoader />}>
                           <CursorPage />
@@ -138,6 +144,14 @@ export default function App() {
                       element={
                         <Suspense fallback={<PageLoader />}>
                           <ClaudeExtensionPage />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/codex"
+                      element={
+                        <Suspense fallback={<PageLoader />}>
+                          <CodexPage />
                         </Suspense>
                       }
                     />
@@ -170,6 +184,14 @@ export default function App() {
                       element={
                         <Suspense fallback={<PageLoader />}>
                           <HealthPage />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/logs"
+                      element={
+                        <Suspense fallback={<PageLoader />}>
+                          <LogsPage />
                         </Suspense>
                       }
                     />

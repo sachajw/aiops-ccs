@@ -19,19 +19,19 @@ function getStatusState(status: AiProviderFamilyState['status']) {
     case 'ready':
       return {
         icon: Check,
-        text: 'Ready',
+        text: 'Ready', // TODO i18n: missing key
         className: 'text-green-600',
       };
     case 'partial':
       return {
         icon: AlertCircle,
-        text: 'Needs attention',
+        text: 'Needs attention', // TODO i18n: missing key
         className: 'text-amber-600',
       };
     default:
       return {
         icon: Circle,
-        text: 'Not configured',
+        text: 'Not configured', // TODO i18n: missing key
         className: 'text-muted-foreground',
       };
   }

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { withApiBase } from '@/lib/api-client';
 
 export interface ClaudeExtensionProfileOption {
@@ -149,6 +150,7 @@ export function useCreateClaudeExtensionBinding() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bindingsQueryKey });
+      // TODO i18n: missing key for 'Binding created'
       toast.success('Binding created');
     },
     onError: (error: Error) => toast.error(error.message),
@@ -157,6 +159,7 @@ export function useCreateClaudeExtensionBinding() {
 
 export function useUpdateClaudeExtensionBinding() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: ({ id, binding }: { id: string; binding: ClaudeExtensionBindingInput }) =>
@@ -172,7 +175,7 @@ export function useUpdateClaudeExtensionBinding() {
       queryClient.invalidateQueries({
         queryKey: ['claude-extension-binding-status', variables.id],
       });
-      toast.success('Binding saved');
+      toast.success(t('claudeExtensionPage.bindingSaved'));
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -180,6 +183,7 @@ export function useUpdateClaudeExtensionBinding() {
 
 export function useDeleteClaudeExtensionBinding() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: (id: string) =>
@@ -188,7 +192,7 @@ export function useDeleteClaudeExtensionBinding() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: bindingsQueryKey });
-      toast.success('Binding deleted');
+      toast.success(t('claudeExtensionPage.bindingDeleted'));
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -216,9 +220,11 @@ function useClaudeExtensionActionMutation(action: 'apply' | 'reset', successMess
 }
 
 export function useApplyClaudeExtensionBinding() {
-  return useClaudeExtensionActionMutation('apply', 'Binding applied');
+  const { t } = useTranslation();
+  return useClaudeExtensionActionMutation('apply', t('claudeExtensionPage.bindingApplied'));
 }
 
 export function useResetClaudeExtensionBinding() {
-  return useClaudeExtensionActionMutation('reset', 'Managed values removed');
+  const { t } = useTranslation();
+  return useClaudeExtensionActionMutation('reset', t('claudeExtensionPage.managedValuesRemoved'));
 }

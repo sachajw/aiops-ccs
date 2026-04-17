@@ -1,74 +1,48 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
+
+import { createApiCommandHandler } from '../../../src/commands/api-command/handler';
 
 let calls: string[] = [];
 
 beforeEach(() => {
   calls = [];
+});
 
-  mock.module('../../../src/commands/api-command/help', () => ({
-    showApiCommandHelp: async () => {
+function buildHandleApiCommand() {
+  return createApiCommandHandler({
+    help: async () => {
       calls.push('help');
     },
-    showUnknownApiCommand: async (command: string) => {
+    unknown: async (command: string) => {
       calls.push(`unknown:${command}`);
     },
-  }));
-
-  mock.module('../../../src/commands/api-command/create-command', () => ({
-    handleApiCreateCommand: async (args: string[]) => {
+    create: async (args: string[]) => {
       calls.push(`create:${args.join(' ')}`);
     },
-  }));
-
-  mock.module('../../../src/commands/api-command/list-command', () => ({
-    handleApiListCommand: async (args: string[]) => {
+    list: async (args: string[]) => {
       calls.push(`list:${args.join(' ')}`);
     },
-  }));
-
-  mock.module('../../../src/commands/api-command/remove-command', () => ({
-    handleApiRemoveCommand: async (args: string[]) => {
-      calls.push(`remove:${args.join(' ')}`);
-    },
-  }));
-
-  mock.module('../../../src/commands/api-command/discover-command', () => ({
-    handleApiDiscoverCommand: async (args: string[]) => {
+    discover: async (args: string[]) => {
       calls.push(`discover:${args.join(' ')}`);
     },
-  }));
-
-  mock.module('../../../src/commands/api-command/copy-command', () => ({
-    handleApiCopyCommand: async (args: string[]) => {
+    copy: async (args: string[]) => {
       calls.push(`copy:${args.join(' ')}`);
     },
-  }));
-
-  mock.module('../../../src/commands/api-command/export-command', () => ({
-    handleApiExportCommand: async (args: string[]) => {
+    export: async (args: string[]) => {
       calls.push(`export:${args.join(' ')}`);
     },
-  }));
-
-  mock.module('../../../src/commands/api-command/import-command', () => ({
-    handleApiImportCommand: async (args: string[]) => {
+    import: async (args: string[]) => {
       calls.push(`import:${args.join(' ')}`);
     },
-  }));
-});
-
-afterEach(() => {
-  mock.restore();
-});
-
-async function loadHandleApiCommand() {
-  const mod = await import(`../../../src/commands/api-command?test=${Date.now()}-${Math.random()}`);
-  return mod.handleApiCommand;
+    remove: async (args: string[]) => {
+      calls.push(`remove:${args.join(' ')}`);
+    },
+  });
 }
 
 describe('api-command router', () => {
   it('defaults to help when no subcommand is provided', async () => {
-    const handleApiCommand = await loadHandleApiCommand();
+    const handleApiCommand = buildHandleApiCommand();
 
     await handleApiCommand([]);
 
@@ -76,7 +50,7 @@ describe('api-command router', () => {
   });
 
   it('routes remove aliases through the named command dispatcher', async () => {
-    const handleApiCommand = await loadHandleApiCommand();
+    const handleApiCommand = buildHandleApiCommand();
 
     await handleApiCommand(['rm', 'profile-a']);
 
@@ -84,7 +58,7 @@ describe('api-command router', () => {
   });
 
   it('forwards list arguments to the handler for validation', async () => {
-    const handleApiCommand = await loadHandleApiCommand();
+    const handleApiCommand = buildHandleApiCommand();
 
     await handleApiCommand(['list', 'unexpected']);
 
@@ -92,7 +66,7 @@ describe('api-command router', () => {
   });
 
   it('routes hardened subcommands through their handlers', async () => {
-    const handleApiCommand = await loadHandleApiCommand();
+    const handleApiCommand = buildHandleApiCommand();
 
     await handleApiCommand(['discover', '--json']);
     await handleApiCommand(['copy', 'source', 'dest']);
@@ -108,7 +82,7 @@ describe('api-command router', () => {
   });
 
   it('delegates unknown commands to the shared unknown handler', async () => {
-    const handleApiCommand = await loadHandleApiCommand();
+    const handleApiCommand = buildHandleApiCommand();
 
     await handleApiCommand(['bogus']);
 

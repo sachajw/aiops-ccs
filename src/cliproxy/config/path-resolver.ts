@@ -17,6 +17,13 @@ export function getCliproxyDir(): string {
 }
 
 /**
+ * Get CLIProxy provider settings directory.
+ */
+export function getCliproxyProvidersDir(): string {
+  return path.join(getCliproxyDir(), 'providers');
+}
+
+/**
  * Get CLIProxy writable directory for logs and runtime files.
  * This directory is set as WRITABLE_PATH env var when spawning CLIProxy.
  * Logs will be stored in ~/.ccs/cliproxy/logs/
@@ -75,5 +82,40 @@ export function getBinDir(): string {
  * Example: ~/.ccs/gemini.settings.json
  */
 export function getProviderSettingsPath(provider: CLIProxyProvider): string {
+  if (provider === 'cursor') {
+    return path.join(getCliproxyProvidersDir(), `${provider}.settings.json`);
+  }
+
+  return getLegacyProviderSettingsPath(provider);
+}
+
+/**
+ * Get CLIProxy provider settings path in the dedicated cliproxy/providers namespace.
+ * Used only for providers that must not collide with legacy top-level settings files.
+ */
+export function getDedicatedProviderSettingsPath(provider: CLIProxyProvider): string {
+  return path.join(getCliproxyProvidersDir(), `${provider}.settings.json`);
+}
+
+/**
+ * Get legacy provider settings file path in ~/.ccs root.
+ * This is kept for compatibility reads/migration of older provider settings.
+ */
+export function getLegacyProviderSettingsPath(provider: CLIProxyProvider): string {
   return path.join(getCcsDir(), `${provider}.settings.json`);
+}
+
+/**
+ * Resolve the effective provider settings path.
+ *
+ * Cursor uses a dedicated cliproxy/providers namespace so it does not collide
+ * with the deprecated Cursor IDE bridge raw settings file.
+ */
+export function migrateLegacyProviderSettingsIfNeeded(provider: CLIProxyProvider): string {
+  if (provider !== 'cursor') {
+    return getProviderSettingsPath(provider);
+  }
+
+  const targetPath = getDedicatedProviderSettingsPath(provider);
+  return targetPath;
 }

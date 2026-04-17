@@ -8,6 +8,7 @@ import { useCopilot } from '@/hooks/use-copilot';
 import type { CopilotNormalizationWarning } from '@/hooks/use-copilot';
 import { isApiConflictError } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import type { ModelPreset } from './types';
 
 /** Required env vars for Copilot settings (informational only - runtime fills defaults) */
@@ -31,6 +32,7 @@ function dedupeWarnings(
 }
 
 export function useCopilotConfigForm() {
+  const { t } = useTranslation();
   const {
     config,
     configLoading,
@@ -91,7 +93,7 @@ export function useCopilotConfigForm() {
       sonnetModel: preset.sonnet,
       haikuModel: preset.haiku,
     }));
-    toast.success(`Applied "${preset.name}" preset`);
+    toast.success(t('toasts.presetApplied', { name: preset.name }));
   };
 
   // Raw JSON content
@@ -191,15 +193,15 @@ export function useCopilotConfigForm() {
       }
 
       if (uniqueWarnings.length > 0) {
-        toast.warning('Copilot configuration saved with model adjustments', {
+        toast.warning(t('toasts.settingsSavedWithAdjustments'), {
           description: descriptions.join(' '),
         });
       } else if (descriptions.length > 0) {
-        toast.success('Copilot configuration saved', {
+        toast.success(t('toasts.settingsSaved'), {
           description: descriptions.join(' '),
         });
       } else {
-        toast.success('Copilot configuration saved');
+        toast.success(t('toasts.settingsSaved'));
       }
 
       // Clear local state
@@ -209,7 +211,7 @@ export function useCopilotConfigForm() {
       if (isApiConflictError(error)) {
         setConflictDialog(true);
       } else {
-        toast.error('Failed to save settings');
+        toast.error(t('toasts.failedSaveSettings'));
       }
     }
   };

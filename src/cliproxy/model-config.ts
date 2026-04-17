@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { InteractivePrompt } from '../utils/prompt';
 import { getProviderCatalog, supportsModelConfig, ModelEntry } from './model-catalog';
-import { getProviderSettingsPath, getClaudeEnvVars } from './config-generator';
+import { getClaudeEnvVars, resolveProviderSettingsPath } from './config-generator';
 import { CLIProxyProvider } from './types';
 import { initUI, color, bold, dim, ok, info, header } from '../utils/ui';
 import { getCcsDir } from '../utils/config-manager';
@@ -31,7 +31,7 @@ function canonicalizeModelForProvider(provider: CLIProxyProvider, model: string)
  * Check if provider has user settings configured
  */
 export function hasUserSettings(provider: CLIProxyProvider): boolean {
-  const settingsPath = getProviderSettingsPath(provider);
+  const settingsPath = resolveProviderSettingsPath(provider);
   return fs.existsSync(settingsPath);
 }
 
@@ -46,7 +46,7 @@ export function getCurrentModel(
 ): string | undefined {
   const settingsPath = customSettingsPath
     ? customSettingsPath.replace(/^~/, os.homedir())
-    : getProviderSettingsPath(provider);
+    : resolveProviderSettingsPath(provider);
   if (!fs.existsSync(settingsPath)) return undefined;
 
   try {
@@ -116,7 +116,7 @@ export async function configureProviderModel(
   // Use custom settings path for CLIProxy variants, otherwise use default provider path
   const settingsPath = customSettingsPath
     ? customSettingsPath.replace(/^~/, os.homedir())
-    : getProviderSettingsPath(provider);
+    : resolveProviderSettingsPath(provider);
 
   // Skip if already configured with a model (unless --config flag).
   // A settings file can exist without model env keys (e.g., hook-only writes).
@@ -249,7 +249,7 @@ export async function showCurrentConfig(provider: CLIProxyProvider): Promise<voi
   await initUI();
 
   const currentModel = getCurrentModel(provider);
-  const settingsPath = getProviderSettingsPath(provider);
+  const settingsPath = resolveProviderSettingsPath(provider);
   const normalizedCurrentModel = currentModel
     ? canonicalizeModelForProvider(provider, currentModel)
     : undefined;

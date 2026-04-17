@@ -6,10 +6,12 @@
  */
 
 export type PresetCategory = 'recommended' | 'alternative';
+export type ProviderPresetTarget = 'claude' | 'droid';
 
 export const PROVIDER_PRESET_IDS = [
   'openrouter',
   'alibaba-coding-plan',
+  'huggingface',
   'ollama',
   'llamacpp',
   'anthropic',
@@ -36,6 +38,7 @@ export interface ProviderPresetDefinition {
   apiKeyHint: string;
   category: PresetCategory;
   requiresApiKey: boolean;
+  defaultTarget?: ProviderPresetTarget;
   /** Additional env vars for thinking mode, etc. */
   extraEnv?: Record<string, string>;
   /** Enable always thinking mode. */
@@ -57,6 +60,7 @@ export const PROVIDER_PRESET_ALIASES: Readonly<Record<string, ProviderPresetId>>
   kimi: 'km',
   alibaba: 'alibaba-coding-plan',
   acp: 'alibaba-coding-plan',
+  hf: 'huggingface',
 });
 
 const RAW_PROVIDER_PRESET_DEFINITIONS: readonly ProviderPresetDefinition[] = [
@@ -134,6 +138,20 @@ const RAW_PROVIDER_PRESET_DEFINITIONS: readonly ProviderPresetDefinition[] = [
     badge: 'Direct',
     featured: true,
     icon: '/assets/providers/claude.svg',
+  },
+  {
+    id: 'huggingface',
+    name: 'Hugging Face',
+    description: 'Inference Providers router via OpenAI-compatible chat completions',
+    baseUrl: 'https://router.huggingface.co/v1',
+    defaultProfileName: 'hf',
+    defaultModel: 'openai/gpt-oss-120b:fastest',
+    apiKeyPlaceholder: 'hf_...',
+    apiKeyHint: 'Create a User Access Token at hf.co/settings/tokens',
+    category: 'alternative',
+    requiresApiKey: true,
+    defaultTarget: 'droid',
+    badge: 'Router',
   },
   {
     id: 'glm',

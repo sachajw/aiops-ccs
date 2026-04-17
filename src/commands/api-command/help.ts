@@ -8,6 +8,8 @@ import {
 import { color, dim, fail, header, initUI, subheader } from '../../utils/ui';
 import { sanitizeHelpText } from './shared';
 
+type HelpWriter = (line: string) => void;
+
 function renderPresetHelpLine(preset: ProviderPreset, idWidth: number): string {
   const presetId = sanitizeHelpText(preset.id) || 'unknown';
   const paddedId = presetId.padEnd(idWidth);
@@ -16,7 +18,7 @@ function renderPresetHelpLine(preset: ProviderPreset, idWidth: number): string {
   return `  ${color(paddedId, 'command')} ${presetName} - ${presetDescription}`;
 }
 
-export async function showApiCommandHelp(): Promise<void> {
+export async function showApiCommandHelp(writeLine: HelpWriter = console.log): Promise<void> {
   await initUI();
   const presetIds = getPresetIds()
     .map((id) => sanitizeHelpText(id))
@@ -25,97 +27,115 @@ export async function showApiCommandHelp(): Promise<void> {
   const presetAliases = getPresetAliases();
   const presetIdWidth = Math.max(0, ...presetIds.map((id) => id.length)) + 2;
 
-  console.log(header('CCS API Management'));
-  console.log('');
-  console.log(subheader('Usage'));
-  console.log(`  ${color('ccs api', 'command')} <command> [options]`);
-  console.log('');
-  console.log(subheader('Commands'));
-  console.log(`  ${color('create [name]', 'command')}    Create new API profile (interactive)`);
-  console.log(`  ${color('list', 'command')}             List all API profiles`);
-  console.log(
+  writeLine(header('CCS API Management'));
+  writeLine('');
+  writeLine(subheader('Usage'));
+  writeLine(`  ${color('ccs api', 'command')} <command> [options]`);
+  writeLine('');
+  writeLine(subheader('Commands'));
+  writeLine(`  ${color('create [name]', 'command')}    Create new API profile (interactive)`);
+  writeLine(`  ${color('list', 'command')}             List all API profiles`);
+  writeLine(
     `  ${color('discover', 'command')}         Discover orphan *.settings.json and register`
   );
-  console.log(`  ${color('copy <src> <dest>', 'command')} Duplicate API profile settings + config`);
-  console.log(
+  writeLine(`  ${color('copy <src> <dest>', 'command')} Duplicate API profile settings + config`);
+  writeLine(
     `  ${color('export <name>', 'command')}    Export profile bundle for cross-device transfer`
   );
-  console.log(
-    `  ${color('import <file>', 'command')}    Import profile bundle and register profile`
-  );
-  console.log(`  ${color('remove <name>', 'command')}    Remove an API profile`);
-  console.log('');
-  console.log(subheader('Options'));
-  console.log(
+  writeLine(`  ${color('import <file>', 'command')}    Import profile bundle and register profile`);
+  writeLine(`  ${color('remove <name>', 'command')}    Remove an API profile`);
+  writeLine('');
+  writeLine(subheader('Options'));
+  writeLine(
     `  ${color('--preset <id>', 'command')}        Use provider preset (${presetIds.join(', ')})`
   );
-  console.log(
+  writeLine(
     `  ${color('--cliproxy-provider <id>', 'command')} Use routed CLIProxy provider (${cliproxyProviderIds.join(', ')})`
   );
-  console.log(`  ${color('--base-url <url>', 'command')}     API base URL (create)`);
-  console.log(`  ${color('--api-key <key>', 'command')}      API key (create)`);
-  console.log(`  ${color('--model <model>', 'command')}      Default model (create)`);
-  console.log(
+  writeLine(`  ${color('--base-url <url>', 'command')}     API base URL (create)`);
+  writeLine(`  ${color('--api-key <key>', 'command')}      API key (create)`);
+  writeLine(`  ${color('--model <model>', 'command')}      Default model (create)`);
+  writeLine(
+    `  ${color('--1m / --no-1m', 'command')}         Write or clear [1m] on compatible Claude mappings`
+  );
+  writeLine(
     `  ${color('--target <cli>', 'command')}       Default target: claude or droid (create)`
   );
-  console.log(`  ${color('--register', 'command')}           Register discovered orphan settings`);
-  console.log(`  ${color('--json', 'command')}               JSON output for discover command`);
-  console.log(`  ${color('--out <file>', 'command')}         Export bundle output path`);
-  console.log(`  ${color('--include-secrets', 'command')}    Include token in export bundle`);
-  console.log(`  ${color('--name <name>', 'command')}        Override profile name during import`);
-  console.log(
+  writeLine(`  ${color('--register', 'command')}           Register discovered orphan settings`);
+  writeLine(`  ${color('--json', 'command')}               JSON output for discover command`);
+  writeLine(`  ${color('--out <file>', 'command')}         Export bundle output path`);
+  writeLine(`  ${color('--include-secrets', 'command')}    Include token in export bundle`);
+  writeLine(`  ${color('--name <name>', 'command')}        Override profile name during import`);
+  writeLine(
     `  ${color('--force', 'command')}              Overwrite existing or bypass validation (create/discover/copy/import)`
   );
-  console.log(`  ${color('--yes, -y', 'command')}            Skip confirmation prompts`);
-  console.log('');
-  console.log(subheader('Provider Presets'));
-  PROVIDER_PRESETS.forEach((preset) => console.log(renderPresetHelpLine(preset, presetIdWidth)));
+  writeLine(`  ${color('--yes, -y', 'command')}            Skip confirmation prompts`);
+  writeLine('');
+  writeLine(subheader('Provider Presets'));
+  PROVIDER_PRESETS.forEach((preset) => writeLine(renderPresetHelpLine(preset, presetIdWidth)));
   Object.entries(presetAliases).forEach(([alias, canonical]) => {
     const safeAlias = sanitizeHelpText(alias);
     const safeCanonical = sanitizeHelpText(canonical);
-    console.log(
-      `  ${dim(`Legacy alias: --preset ${safeAlias} (auto-mapped to ${safeCanonical})`)}`
-    );
+    writeLine(`  ${dim(`Legacy alias: --preset ${safeAlias} (auto-mapped to ${safeCanonical})`)}`);
   });
-  console.log('');
-  console.log(subheader('Examples'));
-  console.log(`  ${dim('# Interactive wizard')}`);
-  console.log(`  ${color('ccs api create', 'command')}`);
-  console.log('');
-  console.log(`  ${dim('# Quick setup with preset')}`);
-  console.log(`  ${color('ccs api create --preset anthropic', 'command')}`);
-  console.log(`  ${color('ccs api create --preset openrouter', 'command')}`);
-  console.log(`  ${color('ccs api create --preset alibaba-coding-plan', 'command')}`);
-  console.log(`  ${color('ccs api create --preset alibaba', 'command')} ${dim('# alias')}`);
-  console.log(`  ${color('ccs api create --preset glm', 'command')}`);
-  console.log('');
-  console.log(`  ${dim('# Create routed profile from existing CLIProxy provider config')}`);
-  console.log(`  ${color('ccs api create --cliproxy-provider gemini', 'command')}`);
-  console.log(
+  writeLine('');
+  writeLine(subheader('Examples'));
+  writeLine(`  ${dim('# Interactive wizard')}`);
+  writeLine(`  ${color('ccs api create', 'command')}`);
+  writeLine('');
+  writeLine(`  ${dim('# Quick setup with preset')}`);
+  writeLine(`  ${color('ccs api create --preset anthropic', 'command')}`);
+  writeLine(
+    `  ${color('ccs api create --preset anthropic --1m', 'command')} ${dim('# explicit Claude [1m] opt-in')}`
+  );
+  writeLine(`  ${color('ccs api create --preset openrouter', 'command')}`);
+  writeLine(`  ${color('ccs api create --preset alibaba-coding-plan', 'command')}`);
+  writeLine(`  ${color('ccs api create --preset alibaba', 'command')} ${dim('# alias')}`);
+  writeLine(
+    `  ${color('ccs api create hf-router --preset hf', 'command')} ${dim('# defaults to droid for generic chat completions')}`
+  );
+  writeLine(`  ${color('ccs api create --preset glm', 'command')}`);
+  writeLine('');
+  writeLine(subheader('Claude Long Context'));
+  writeLine(`  ${dim('Plain Claude model IDs stay on standard context by default.')}`);
+  writeLine(
+    `  ${dim('Use --1m during create to append [1m] to compatible Claude mappings, or --no-1m to force plain IDs.')}`
+  );
+  writeLine(
+    `  ${dim('CCS controls only the saved [1m] suffix. Provider pricing/entitlement stay upstream, and some accounts can still return 429 for long-context requests.')}`
+  );
+  writeLine('');
+  writeLine(`  ${dim('# Create routed profile from existing CLIProxy provider config')}`);
+  writeLine(`  ${color('ccs api create --cliproxy-provider gemini', 'command')}`);
+  writeLine(
     `  ${color('ccs api create gemini-droid --cliproxy-provider gemini --target droid', 'command')}`
   );
-  console.log('');
-  console.log(`  ${dim('# Create with name')}`);
-  console.log(`  ${color('ccs api create myapi', 'command')}`);
-  console.log(`  ${color('ccs api create mydroid --preset glm --target droid', 'command')}`);
-  console.log('');
-  console.log(`  ${dim('# Remove API profile')}`);
-  console.log(`  ${color('ccs api remove myapi', 'command')}`);
-  console.log('');
-  console.log(`  ${dim('# Discover and register orphan settings files')}`);
-  console.log(`  ${color('ccs api discover', 'command')}`);
-  console.log(`  ${color('ccs api discover --register', 'command')}`);
-  console.log('');
-  console.log(`  ${dim('# Duplicate an existing API profile')}`);
-  console.log(`  ${color('ccs api copy glm glm-backup', 'command')}`);
-  console.log('');
-  console.log(`  ${dim('# Export and import across devices')}`);
-  console.log(`  ${color('ccs api export glm --out ./glm.ccs-profile.json', 'command')}`);
-  console.log(`  ${color('ccs api import ./glm.ccs-profile.json', 'command')}`);
-  console.log('');
-  console.log(`  ${dim('# Show all API profiles')}`);
-  console.log(`  ${color('ccs api list', 'command')}`);
-  console.log('');
+  writeLine(`  ${color('ccs api create codex-api --cliproxy-provider codex', 'command')}`);
+  writeLine(
+    `  ${color('ccs codex-api --target codex', 'command')} ${dim('# runtime-only native Codex launch')}`
+  );
+  writeLine('');
+  writeLine(`  ${dim('# Create with name')}`);
+  writeLine(`  ${color('ccs api create myapi', 'command')}`);
+  writeLine(`  ${color('ccs api create mydroid --preset glm --target droid', 'command')}`);
+  writeLine('');
+  writeLine(`  ${dim('# Remove API profile')}`);
+  writeLine(`  ${color('ccs api remove myapi', 'command')}`);
+  writeLine('');
+  writeLine(`  ${dim('# Discover and register orphan settings files')}`);
+  writeLine(`  ${color('ccs api discover', 'command')}`);
+  writeLine(`  ${color('ccs api discover --register', 'command')}`);
+  writeLine('');
+  writeLine(`  ${dim('# Duplicate an existing API profile')}`);
+  writeLine(`  ${color('ccs api copy glm glm-backup', 'command')}`);
+  writeLine('');
+  writeLine(`  ${dim('# Export and import across devices')}`);
+  writeLine(`  ${color('ccs api export glm --out ./glm.ccs-profile.json', 'command')}`);
+  writeLine(`  ${color('ccs api import ./glm.ccs-profile.json', 'command')}`);
+  writeLine('');
+  writeLine(`  ${dim('# Show all API profiles')}`);
+  writeLine(`  ${color('ccs api list', 'command')}`);
+  writeLine('');
 }
 
 export async function showUnknownApiCommand(command: string): Promise<void> {

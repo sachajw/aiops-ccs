@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { MaskedInput } from '@/components/ui/masked-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertCircle,
@@ -19,11 +20,24 @@ import {
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useRawConfig, useWebSearchConfig } from '../../hooks';
-import type { CliStatus, WebSearchProvidersConfig } from '../../types';
+import type {
+  CliStatus,
+  WebSearchApiKeyProviderId,
+  WebSearchApiKeyState,
+  WebSearchProvidersConfig,
+} from '../../types';
 import { ProviderCard, type ProviderFieldConfig } from './provider-card';
 
-type ProviderId = 'exa' | 'tavily' | 'brave' | 'duckduckgo' | 'gemini' | 'opencode' | 'grok';
-type ProviderFieldKey = 'model' | 'timeout' | 'max_results';
+type ProviderId =
+  | 'exa'
+  | 'tavily'
+  | 'brave'
+  | 'searxng'
+  | 'duckduckgo'
+  | 'gemini'
+  | 'opencode'
+  | 'grok';
+type ProviderFieldKey = 'model' | 'timeout' | 'max_results' | 'url';
 
 interface ProviderFieldDefinition {
   key: ProviderFieldKey;
@@ -48,14 +62,17 @@ interface ProviderDefinition {
   fields?: ProviderFieldDefinition[];
 }
 
+// TODO i18n: missing keys for CHAIN_STEPS titles
 const CHAIN_STEPS = [
   { id: 'exa', title: 'Exa', defaultEnabled: false },
   { id: 'tavily', title: 'Tavily', defaultEnabled: false },
   { id: 'brave', title: 'Brave', defaultEnabled: false },
+  { id: 'searxng', title: 'SearXNG', defaultEnabled: false },
   { id: 'duckduckgo', title: 'DuckDuckGo', defaultEnabled: true },
   { id: 'legacy', title: 'Legacy CLI', defaultEnabled: false },
 ] as const;
 
+// TODO i18n: missing keys for BACKEND_PROVIDERS titles, descriptions, badges, footerNotes, field labels, helpTexts, placeholders
 const BACKEND_PROVIDERS: ProviderDefinition[] = [
   {
     id: 'exa',
@@ -125,6 +142,37 @@ const BACKEND_PROVIDERS: ProviderDefinition[] = [
     ],
   },
   {
+    id: 'searxng',
+    title: 'SearXNG',
+    description: 'Configurable JSON backend for self-hosted or public SearXNG instances.',
+    badge: 'SELF-HOSTED',
+    badgeTone: 'cyan',
+    defaultEnabled: false,
+    fallbackDetail: 'Set a valid base URL',
+    footerNote: 'Runs after Brave and before DuckDuckGo when enabled and ready.',
+    fields: [
+      {
+        key: 'url',
+        label: 'Base URL',
+        type: 'text',
+        placeholder: 'https://search.example.com',
+        helpText:
+          'Paste the instance base URL only. CCS appends /search?format=json for you and rejects embedded credentials.',
+        defaultValue: '',
+      },
+      {
+        key: 'max_results',
+        label: 'Max results',
+        type: 'number',
+        placeholder: '5',
+        helpText: 'Clamp between 1 and 10 results.',
+        defaultValue: 5,
+        min: 1,
+        max: 10,
+      },
+    ],
+  },
+  {
     id: 'duckduckgo',
     title: 'DuckDuckGo',
     description: 'Zero-setup floor. Keep this on unless you want no built-in fallback at all.',
@@ -148,6 +196,7 @@ const BACKEND_PROVIDERS: ProviderDefinition[] = [
   },
 ];
 
+// TODO i18n: missing keys for LEGACY_PROVIDERS titles, descriptions, badges, footerNotes, field labels, helpTexts, placeholders
 const LEGACY_PROVIDERS: ProviderDefinition[] = [
   {
     id: 'gemini',
@@ -246,6 +295,7 @@ function getStatusTone(
   return 'idle';
 }
 
+// TODO i18n: missing keys for getStatusLabel return values ("Ready", "Needs setup", "Disabled")
 function getStatusLabel(provider: CliStatus | undefined, enabled: boolean): string {
   if (enabled && provider?.available) {
     return 'Ready';
@@ -325,6 +375,32 @@ function getConfiguredValue(
   return String(configured ?? field.defaultValue);
 }
 
+function isApiKeyProvider(providerId: ProviderId): providerId is WebSearchApiKeyProviderId {
+  return providerId === 'exa' || providerId === 'tavily' || providerId === 'brave';
+}
+
+// TODO i18n: missing keys for getApiKeySummary return values
+function getApiKeySummary(apiKeyState: WebSearchApiKeyState | undefined): string {
+  if (!apiKeyState?.configured) {
+    return 'Not stored';
+  }
+
+  if (!apiKeyState.available && apiKeyState.source === 'global_env') {
+    return 'Stored in dashboard, but Global Env is disabled';
+  }
+
+  switch (apiKeyState.source) {
+    case 'global_env':
+      return 'Stored in dashboard';
+    case 'process_env':
+      return 'Detected from shell env';
+    case 'both':
+      return 'Stored in dashboard + shell env';
+    case 'none':
+      return 'Not stored';
+  }
+}
+
 export default function WebSearchSection() {
   const { t } = useTranslation();
   const {
@@ -341,7 +417,13 @@ export default function WebSearchSection() {
   } = useWebSearchConfig();
   const { fetchRawConfig } = useRawConfig();
   const [fieldDrafts, setFieldDrafts] = useState<Record<string, string>>({});
+  const [apiKeyDrafts, setApiKeyDrafts] = useState<
+    Partial<Record<WebSearchApiKeyProviderId, string>>
+  >({});
   const [savedFieldId, setSavedFieldId] = useState<string | null>(null);
+  const [savedApiKeyProvider, setSavedApiKeyProvider] = useState<WebSearchApiKeyProviderId | null>(
+    null
+  );
   const [legacyExpanded, setLegacyExpanded] = useState(false);
 
   useEffect(() => {
@@ -349,24 +431,6 @@ export default function WebSearchSection() {
     fetchStatus();
     fetchRawConfig();
   }, [fetchConfig, fetchStatus, fetchRawConfig]);
-
-  useEffect(() => {
-    if (!config?.providers) {
-      return;
-    }
-
-    const nextDrafts: Record<string, string> = {};
-    for (const provider of [...BACKEND_PROVIDERS, ...LEGACY_PROVIDERS]) {
-      for (const field of provider.fields ?? []) {
-        nextDrafts[`${provider.id}.${field.key}`] = getConfiguredValue(
-          config.providers,
-          provider.id,
-          field
-        );
-      }
-    }
-    setFieldDrafts(nextDrafts);
-  }, [config]);
 
   const providerStatus = useMemo(
     () => new Map((status?.providers ?? []).map((provider) => [provider.id, provider])),
@@ -378,6 +442,7 @@ export default function WebSearchSection() {
   const legacyReady = legacyEnabled.some((provider) => providerStatus.get(provider.id)?.available);
 
   const legacySummary =
+    // TODO i18n: missing keys for legacy summary format strings ("Off", "X enabled", "N enabled")
     legacyEnabled.length === 0
       ? 'Off'
       : legacyEnabled.length === 1
@@ -386,7 +451,7 @@ export default function WebSearchSection() {
 
   const toggleProvider = async (providerId: ProviderId, enabled: boolean) => {
     const currentProviders = (config?.providers ?? {}) as WebSearchProvidersConfig;
-    await saveConfig({
+    const saved = await saveConfig({
       providers: {
         ...currentProviders,
         [providerId]: {
@@ -395,6 +460,10 @@ export default function WebSearchSection() {
         },
       },
     });
+
+    if (saved) {
+      await fetchRawConfig();
+    }
   };
 
   const updateDraft = (providerId: ProviderId, fieldKey: ProviderFieldKey, value: string) => {
@@ -410,7 +479,10 @@ export default function WebSearchSection() {
     const currentProviders = (config.providers ?? {}) as WebSearchProvidersConfig;
     const currentProviderConfig = currentProviders[providerId] ?? {};
     const currentValue = currentProviderConfig[field.key] ?? field.defaultValue;
-    const normalized = normalizeFieldValue(field, fieldDrafts[fieldId] ?? String(currentValue));
+    const normalized = normalizeFieldValue(
+      field,
+      fieldDrafts[fieldId] ?? getConfiguredValue(currentProviders, providerId, field)
+    );
 
     setFieldDrafts((current) => ({ ...current, [fieldId]: String(normalized) }));
 
@@ -429,9 +501,49 @@ export default function WebSearchSection() {
     });
 
     if (saved) {
+      await fetchRawConfig();
       setSavedFieldId(fieldId);
       setTimeout(() => {
         setSavedFieldId((current) => (current === fieldId ? null : current));
+      }, 1200);
+    }
+  };
+
+  const saveApiKey = async (providerId: WebSearchApiKeyProviderId) => {
+    const nextValue = apiKeyDrafts[providerId]?.trim() ?? '';
+    if (!nextValue) {
+      return;
+    }
+
+    const saved = await saveConfig({
+      apiKeys: {
+        [providerId]: nextValue,
+      },
+    });
+
+    if (saved) {
+      await fetchRawConfig();
+      setApiKeyDrafts((current) => ({ ...current, [providerId]: '' }));
+      setSavedApiKeyProvider(providerId);
+      setTimeout(() => {
+        setSavedApiKeyProvider((current) => (current === providerId ? null : current));
+      }, 1200);
+    }
+  };
+
+  const removeApiKey = async (providerId: WebSearchApiKeyProviderId) => {
+    const saved = await saveConfig({
+      apiKeys: {
+        [providerId]: '',
+      },
+    });
+
+    if (saved) {
+      await fetchRawConfig();
+      setApiKeyDrafts((current) => ({ ...current, [providerId]: '' }));
+      setSavedApiKeyProvider(providerId);
+      setTimeout(() => {
+        setSavedApiKeyProvider((current) => (current === providerId ? null : current));
       }, 1200);
     }
   };
@@ -443,7 +555,13 @@ export default function WebSearchSection() {
       return {
         id: fieldId,
         label: field.label,
-        value: fieldDrafts[fieldId] ?? String(field.defaultValue),
+        value:
+          fieldDrafts[fieldId] ??
+          getConfiguredValue(
+            (config?.providers ?? {}) as WebSearchProvidersConfig,
+            provider.id,
+            field
+          ),
         placeholder: field.placeholder,
         type: field.type,
         helpText: field.helpText,
@@ -512,6 +630,7 @@ export default function WebSearchSection() {
                     <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-primary/20 bg-primary/8 text-primary">
                       <Globe className="h-4 w-4" />
                     </div>
+                    {/* TODO i18n: missing key for "Execution chain" */}
                     <p className="text-sm font-semibold tracking-tight">Execution chain</p>
                   </div>
                   <p className="text-sm text-muted-foreground">
@@ -574,6 +693,7 @@ export default function WebSearchSection() {
                   <Globe className="h-4 w-4" />
                 </div>
                 <div>
+                  {/* TODO i18n: missing key for "Primary backends" */}
                   <h3 className="text-base font-semibold tracking-tight">Primary backends</h3>
                   <p className="text-sm text-muted-foreground">
                     Real backends run top-down before any legacy CLI fallback.
@@ -587,6 +707,7 @@ export default function WebSearchSection() {
                   const enabled =
                     config?.providers?.[provider.id]?.enabled ?? provider.defaultEnabled;
                   const tone = getStatusTone(currentStatus, enabled);
+                  const apiKeyProviderId = isApiKeyProvider(provider.id) ? provider.id : null;
 
                   return (
                     <div
@@ -620,7 +741,83 @@ export default function WebSearchSection() {
                           void toggleProvider(provider.id, enabled);
                         }}
                         fields={buildFields(provider)}
-                      />
+                      >
+                        {apiKeyProviderId && (
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                                  {/* TODO i18n: missing key for "API Key" */}
+                                  API Key
+                                </p>
+                                <p className="mt-1 text-sm text-foreground/90">
+                                  {getApiKeySummary(config?.apiKeys?.[apiKeyProviderId])}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {config?.apiKeys?.[apiKeyProviderId]?.maskedValue
+                                    ? `${config.apiKeys[apiKeyProviderId]?.envVar} ${config.apiKeys[apiKeyProviderId]?.maskedValue}`
+                                    : /* TODO i18n: missing key for "Store X here..." */ `Store ${provider.badge} here so the backend is ready immediately after you enable it.`}
+                                </p>
+                              </div>
+                              {savedApiKeyProvider === provider.id && (
+                                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                  {/* TODO i18n: missing key for "Saved" */ 'Saved'}
+                                </span>
+                              )}
+                            </div>
+
+                            <MaskedInput
+                              id={`${provider.id}.api-key`}
+                              value={apiKeyDrafts[apiKeyProviderId] ?? ''}
+                              onChange={(event) =>
+                                setApiKeyDrafts((current) => ({
+                                  ...current,
+                                  [apiKeyProviderId]: event.target.value,
+                                }))
+                              }
+                              placeholder={
+                                config?.apiKeys?.[apiKeyProviderId]?.configured
+                                  ? /* TODO i18n: missing key for "Enter a new key to rotate the stored secret" */ 'Enter a new key to rotate the stored secret'
+                                  : /* TODO i18n: missing key for "Paste X" */ `Paste ${provider.badge}`
+                              }
+                              className="bg-background/80 font-mono text-sm"
+                              disabled={saving}
+                            />
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  void saveApiKey(apiKeyProviderId);
+                                }}
+                                disabled={
+                                  saving || !(apiKeyDrafts[apiKeyProviderId]?.trim() ?? '').length
+                                }
+                              >
+                                {config?.apiKeys?.[apiKeyProviderId]?.configured
+                                  ? /* TODO i18n: missing key for "Update key" */ 'Update key'
+                                  : /* TODO i18n: missing key for "Save key" */ 'Save key'}
+                              </Button>
+
+                              {(config?.apiKeys?.[apiKeyProviderId]?.source === 'global_env' ||
+                                config?.apiKeys?.[apiKeyProviderId]?.source === 'both') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    void removeApiKey(apiKeyProviderId);
+                                  }}
+                                  disabled={saving}
+                                >
+                                  {
+                                    /* TODO i18n: missing key for "Remove stored key" */ 'Remove stored key'
+                                  }
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </ProviderCard>
                     </div>
                   );
                 })}
@@ -642,6 +839,7 @@ export default function WebSearchSection() {
                   <KeyRound className="h-4 w-4" />
                 </div>
                 <div>
+                  {/* TODO i18n: missing key for "Legacy CLI fallbacks" */}
                   <h3 className="text-base font-semibold tracking-tight">Legacy CLI fallbacks</h3>
                   <p className="text-sm text-muted-foreground">
                     Runs only after every enabled real backend fails.

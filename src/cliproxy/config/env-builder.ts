@@ -19,7 +19,10 @@ import {
   normalizeProtocol,
   CLIPROXY_DEFAULT_PORT,
 } from './port-manager';
-import { getProviderSettingsPath } from './path-resolver';
+import {
+  getLegacyProviderSettingsPath,
+  migrateLegacyProviderSettingsIfNeeded,
+} from './path-resolver';
 import {
   canonicalizeModelIdForProvider,
   MODEL_ENV_VAR_KEYS,
@@ -49,6 +52,15 @@ const REQUIRED_PROVIDER_ENV_KEYS = [
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
 ] as const;
+const CURSOR_LEGACY_ENV_OVERRIDE_KEYS = new Set([
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_AUTH_TOKEN',
+  'ANTHROPIC_API_KEY',
+]);
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
 function stripCodexEffortSuffix(modelId: string): string {
   return modelId.replace(CODEX_EFFORT_SUFFIX_REGEX, '');
@@ -285,6 +297,63 @@ export function getClaudeEnvVars(
   return normalizeModelEnvVarsForProvider(mergedEnv, provider);
 }
 
+function buildCursorProviderSettingsFromLegacy(
+  legacySettings: Record<string, unknown>
+): Record<string, unknown> {
+  const defaultEnv = getClaudeEnvVars('cursor');
+  const legacyEnvSource = legacySettings.env;
+  const legacyEnv = isObjectRecord(legacyEnvSource) ? legacyEnvSource : {};
+  const migratedEnv: NodeJS.ProcessEnv = { ...defaultEnv };
+
+  for (const [key, value] of Object.entries(legacyEnv)) {
+    if (typeof value !== 'string' || CURSOR_LEGACY_ENV_OVERRIDE_KEYS.has(key)) {
+      continue;
+    }
+    migratedEnv[key] = value;
+  }
+
+  delete migratedEnv.ANTHROPIC_API_KEY;
+
+  return {
+    ...legacySettings,
+    env: normalizeModelEnvVarsForProvider(migratedEnv, 'cursor'),
+  };
+}
+
+/**
+ * Resolve the provider settings path, migrating legacy Cursor provider settings into
+ * the dedicated cliproxy/providers namespace on first access.
+ */
+export function resolveProviderSettingsPath(provider: CLIProxyProvider): string {
+  const settingsPath = migrateLegacyProviderSettingsIfNeeded(provider);
+  if (provider !== 'cursor' || fs.existsSync(settingsPath)) {
+    return settingsPath;
+  }
+
+  const legacySettingsPath = getLegacyProviderSettingsPath(provider);
+  if (!fs.existsSync(legacySettingsPath)) {
+    return settingsPath;
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(legacySettingsPath, 'utf-8')) as unknown;
+    if (!isObjectRecord(parsed)) {
+      return settingsPath;
+    }
+
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    fs.writeFileSync(
+      settingsPath,
+      JSON.stringify(buildCursorProviderSettingsFromLegacy(parsed), null, 2) + '\n',
+      { mode: 0o600 }
+    );
+  } catch {
+    // Best-effort migration only. Callers will fall back to defaults if the legacy file is invalid.
+  }
+
+  return settingsPath;
+}
+
 /**
  * Get global env vars to inject into all third-party profiles.
  * Returns empty object if disabled.
@@ -465,7 +534,7 @@ export function getEffectiveEnvVars(
   }
 
   // Priority 2: Default provider settings file
-  const settingsPath = getProviderSettingsPath(provider);
+  const settingsPath = resolveProviderSettingsPath(provider);
 
   // Check for user override file
   if (fs.existsSync(settingsPath)) {
@@ -505,7 +574,7 @@ export function getEffectiveEnvVars(
  * Called during installation/first run
  */
 export function ensureProviderSettings(provider: CLIProxyProvider): void {
-  const settingsPath = getProviderSettingsPath(provider);
+  const settingsPath = resolveProviderSettingsPath(provider);
   const defaultEnv = getClaudeEnvVars(provider);
 
   const writeSettings = (settings: Record<string, unknown>): void => {
@@ -663,7 +732,7 @@ export function getRemoteEnvVars(
 
   // Priority 2: Default provider settings file (~/.ccs/{provider}.settings.json)
   if (Object.keys(userEnvVars).length === 0) {
-    const settingsPath = getProviderSettingsPath(provider);
+    const settingsPath = resolveProviderSettingsPath(provider);
     if (fs.existsSync(settingsPath)) {
       try {
         const content = fs.readFileSync(settingsPath, 'utf-8');

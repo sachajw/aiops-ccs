@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, Code2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 
 import { HeaderSection } from './header-section';
@@ -22,6 +23,7 @@ import { RawEditorSection } from './raw-editor-section';
 import { useCopilotConfigForm } from './use-copilot-config-form';
 
 export function CopilotConfigForm() {
+  const { t } = useTranslation();
   const {
     configLoading,
     rawSettingsLoading,
@@ -83,9 +85,10 @@ export function CopilotConfigForm() {
         <div className="px-6 pt-4 shrink-0">
           <Alert variant="warning">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Deprecated Copilot models detected</AlertTitle>
+            <AlertTitle>{t('copilotConfigForm.deprecatedModels')}</AlertTitle>
             <AlertDescription className="space-y-2">
               <p>
+                {/* TODO i18n: missing key copilotConfigForm.deprecatedModelsDesc */}
                 Loading this page did not rewrite your files. Save the Copilot configuration to
                 persist these replacements.
               </p>
@@ -108,12 +111,15 @@ export function CopilotConfigForm() {
               <div className="px-4 pt-4 shrink-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="config" className="flex-1">
+                    {/* TODO i18n: missing key copilotConfigForm.modelConfig */}
                     Model Config
                   </TabsTrigger>
                   <TabsTrigger value="settings" className="flex-1">
+                    {/* TODO i18n: missing key copilotConfigForm.settings */}
                     Settings
                   </TabsTrigger>
                   <TabsTrigger value="info" className="flex-1">
+                    {/* TODO i18n: missing key copilotConfigForm.info */}
                     Info
                   </TabsTrigger>
                 </TabsList>

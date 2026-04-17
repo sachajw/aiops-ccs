@@ -26,6 +26,7 @@ describe('ModelConfigSection presets', () => {
         haikuModel="gpt-5-codex-mini"
         providerModels={[]}
         provider="codex"
+        onExtendedContextToggle={vi.fn()}
         onApplyPreset={onApplyPreset}
         onUpdateEnvValue={vi.fn()}
         onOpenCustomPreset={vi.fn()}
@@ -55,10 +56,11 @@ describe('ModelConfigSection presets', () => {
         savedPresets={[]}
         currentModel="claude-opus-4-6-thinking"
         opusModel="claude-opus-4-6-thinking"
-        sonnetModel="claude-sonnet-4-6"
-        haikuModel="claude-sonnet-4-6"
+        sonnetModel="gemini-3.9-pro-preview"
+        haikuModel="gemini-3-9-flash-preview"
         providerModels={[]}
         provider="agy"
+        onExtendedContextToggle={vi.fn()}
         onApplyPreset={vi.fn()}
         onUpdateEnvValue={vi.fn()}
         onOpenCustomPreset={vi.fn()}
@@ -69,5 +71,186 @@ describe('ModelConfigSection presets', () => {
     expect(screen.queryByText('Free Tier')).not.toBeInTheDocument();
     expect(screen.queryByText('Paid Tier')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Claude Opus 4.6 Thinking' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gemini Pro High' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gemini Pro Low' })).toBeInTheDocument();
+    expect(screen.getByTestId('extended-context-toggle')).toBeInTheDocument();
+  });
+
+  it('applies Antigravity Gemini presets using the best live Gemini family ids', async () => {
+    const onApplyPreset = vi.fn();
+
+    render(
+      <ModelConfigSection
+        catalog={MODEL_CATALOGS.agy}
+        savedPresets={[]}
+        currentModel="claude-opus-4-6-thinking"
+        opusModel="claude-opus-4-6-thinking"
+        sonnetModel="gemini-3.9-pro-preview"
+        haikuModel="gemini-3-9-flash-preview"
+        providerModels={[
+          { id: 'gemini-3.9-pro-preview-customtools', owned_by: 'antigravity' },
+          { id: 'gemini-3.9-pro-preview', owned_by: 'antigravity' },
+          { id: 'gemini-3-9-flash-preview-customtools', owned_by: 'antigravity' },
+          { id: 'gemini-3-9-flash-preview', owned_by: 'antigravity' },
+        ]}
+        provider="agy"
+        onExtendedContextToggle={vi.fn()}
+        onApplyPreset={onApplyPreset}
+        onUpdateEnvValue={vi.fn()}
+        onOpenCustomPreset={vi.fn()}
+        onDeletePreset={vi.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gemini Pro High' }));
+
+    expect(onApplyPreset).toHaveBeenCalledWith({
+      ANTHROPIC_MODEL: 'gemini-3.1-pro-high',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-high',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-3.1-pro-high',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3-9-flash-preview',
+    });
+  });
+
+  it('applies managed short prefixes when routing guidance is available', async () => {
+    const onApplyPreset = vi.fn();
+
+    render(
+      <ModelConfigSection
+        catalog={MODEL_CATALOGS.gemini}
+        savedPresets={[]}
+        currentModel="gemini-3-flash-preview"
+        opusModel="gemini-3.1-pro-preview"
+        sonnetModel="gemini-3.1-pro-preview"
+        haikuModel="gemini-3-flash-preview"
+        providerModels={[]}
+        routing={{
+          provider: 'gemini',
+          displayName: 'Gemini',
+          prefix: 'gcli',
+          safeCount: 0,
+          shadowedCount: 2,
+          prefixOnlyCount: 0,
+          models: [
+            {
+              modelId: 'gemini-3.1-pro-preview',
+              modelName: 'Gemini Pro',
+              prefix: 'gcli',
+              pinnedModelId: 'gcli/gemini-3.1-pro-preview',
+              recommendedModelId: 'gcli/gemini-3.1-pro-preview',
+              pinnedAvailable: true,
+              unprefixedStatus: 'shadowed',
+              effectiveProvider: 'agy',
+              effectiveDisplayName: 'Antigravity',
+              effectiveOwnedBy: 'antigravity',
+              summary: 'shadowed by Antigravity',
+            },
+            {
+              modelId: 'gemini-3-flash-preview',
+              modelName: 'Gemini Flash',
+              prefix: 'gcli',
+              pinnedModelId: 'gcli/gemini-3-flash-preview',
+              recommendedModelId: 'gcli/gemini-3-flash-preview',
+              pinnedAvailable: true,
+              unprefixedStatus: 'shadowed',
+              effectiveProvider: 'agy',
+              effectiveDisplayName: 'Antigravity',
+              effectiveOwnedBy: 'antigravity',
+              summary: 'shadowed by Antigravity',
+            },
+          ],
+        }}
+        provider="gemini"
+        onExtendedContextToggle={vi.fn()}
+        onApplyPreset={onApplyPreset}
+        onUpdateEnvValue={vi.fn()}
+        onOpenCustomPreset={vi.fn()}
+        onDeletePreset={vi.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gemini Flash' }));
+
+    expect(onApplyPreset).toHaveBeenCalledWith({
+      ANTHROPIC_MODEL: 'gcli/gemini-3-flash-preview',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'gcli/gemini-3.1-pro-preview',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'gcli/gemini-3.1-pro-preview',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gcli/gemini-3-flash-preview',
+    });
+  });
+
+  it('normalizes saved presets through preferred pinned model ids when live pinning is available', async () => {
+    const onApplyPreset = vi.fn();
+
+    render(
+      <ModelConfigSection
+        catalog={MODEL_CATALOGS.gemini}
+        savedPresets={[
+          {
+            name: 'legacy',
+            default: 'gemini-3-flash-preview',
+            opus: 'gemini-3.1-pro-preview',
+            sonnet: 'gemini-3.1-pro-preview',
+            haiku: 'gemini-3-flash-preview',
+          },
+        ]}
+        currentModel="gemini-3-flash-preview"
+        opusModel="gemini-3.1-pro-preview"
+        sonnetModel="gemini-3.1-pro-preview"
+        haikuModel="gemini-3-flash-preview"
+        providerModels={[]}
+        routing={{
+          provider: 'gemini',
+          displayName: 'Gemini',
+          prefix: 'gcli',
+          safeCount: 0,
+          shadowedCount: 2,
+          prefixOnlyCount: 0,
+          models: [
+            {
+              modelId: 'gemini-3.1-pro-preview',
+              modelName: 'Gemini Pro',
+              prefix: 'gcli',
+              pinnedModelId: 'gcli/gemini-3.1-pro-preview',
+              recommendedModelId: 'gcli/gemini-3.1-pro-preview',
+              pinnedAvailable: true,
+              unprefixedStatus: 'shadowed',
+              effectiveProvider: 'agy',
+              effectiveDisplayName: 'Antigravity',
+              effectiveOwnedBy: 'antigravity',
+              summary: 'shadowed by Antigravity',
+            },
+            {
+              modelId: 'gemini-3-flash-preview',
+              modelName: 'Gemini Flash',
+              prefix: 'gcli',
+              pinnedModelId: 'gcli/gemini-3-flash-preview',
+              recommendedModelId: 'gcli/gemini-3-flash-preview',
+              pinnedAvailable: true,
+              unprefixedStatus: 'shadowed',
+              effectiveProvider: 'agy',
+              effectiveDisplayName: 'Antigravity',
+              effectiveOwnedBy: 'antigravity',
+              summary: 'shadowed by Antigravity',
+            },
+          ],
+        }}
+        provider="gemini"
+        onExtendedContextToggle={vi.fn()}
+        onApplyPreset={onApplyPreset}
+        onUpdateEnvValue={vi.fn()}
+        onOpenCustomPreset={vi.fn()}
+        onDeletePreset={vi.fn()}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'legacy' }));
+
+    expect(onApplyPreset).toHaveBeenCalledWith({
+      ANTHROPIC_MODEL: 'gcli/gemini-3-flash-preview',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'gcli/gemini-3.1-pro-preview',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'gcli/gemini-3.1-pro-preview',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gcli/gemini-3-flash-preview',
+    });
   });
 });
